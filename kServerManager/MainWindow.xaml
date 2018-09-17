@@ -1,0 +1,198 @@
+﻿<Window x:Class="BackupAndStart.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:BackupAndStart"
+        mc:Ignorable="d"
+        Title="kServer Manager" Height="375" Width="685" AllowsTransparency="True" ResizeMode="NoResize" WindowStyle="None" WindowStartupLocation="CenterScreen" Background="{x:Null}" Loaded="Window_Loaded" BorderBrush="Black" Closing="Window_Closing">
+    <Border BorderBrush="#FF00C5FF" BorderThickness="1">
+
+        <DockPanel>
+
+            <DockPanel x:Name="TitleBar" DockPanel.Dock="Top" Height="30" Background="#7FD7E4F2" MouseDown="TitleBar_MouseDown">
+                <Button x:Name="CloseButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Width="21" Click="CloseButton_Click">
+                    <Button.Style>
+                        <Style TargetType="{x:Type Button}">
+                            <Setter Property="Background" Value="PaleVioletRed"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Button}">
+                                        <Border Background="{TemplateBinding Background}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="MediumVioletRed"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="DarkRed"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <TextBlock Text="r" FontFamily="Webdings" Padding="0.7, 0, 0, 0" FontSize="16" Foreground="White"/>
+
+                </Button>
+                <Button x:Name="MinimizeButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Width="21" Click="MinimizeButton_Click">
+                    <Button.Style>
+                        <Style TargetType="{x:Type Button}">
+                            <Setter Property="Background" Value="PaleTurquoise"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Button}">
+                                        <Border Background="{TemplateBinding Background}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="Turquoise"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="DarkTurquoise"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+
+                    <TextBlock Text="_" FontFamily="Calibri" Margin="0 -3 0 0" FontSize="16" Foreground="White"/>
+
+                </Button>
+                <Label x:Name="TitleLabel" Margin="1,1,1,1.4" DockPanel.Dock="Left" Content="kServer Manager">
+                    <Label.Effect>
+                        <DropShadowEffect ShadowDepth="1" Color="White"/>
+                    </Label.Effect>
+                </Label>
+
+            </DockPanel>
+
+            <Grid DockPanel.Dock="Top">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition MaxWidth="150" Width="100*"/>
+                    <ColumnDefinition/>
+                </Grid.ColumnDefinitions>
+
+                <DockPanel Grid.Row="1" Grid.Column="0" Background="#7F0078D7">
+                    <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="StartButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StartButton_Click">
+                            <Button.Foreground>
+                                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                    <GradientStop Color="#FF0C8100" Offset="0"/>
+                                    <GradientStop Color="#FF0E9B00" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Button.Foreground> Start
+                        </Button>
+                        <Button x:Name="StopButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StopButton_Click">
+                            <Button.Foreground>
+                                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                    <GradientStop Color="#FF810000" Offset="0"/>
+                                    <GradientStop Color="#FF9B0000" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Button.Foreground>
+
+                            Stop
+                        </Button>
+                        <Button x:Name="RestartButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="RestartButton_Click">
+                            <Button.Foreground>
+                                <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
+                                    <GradientStop Color="#FFCD8200" Offset="0"/>
+                                    <GradientStop Color="#FFFF9700" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Button.Foreground> Restart
+                        </Button>
+                    </StackPanel>
+                    <Button x:Name="IPButton" Content="Fetching IP Address" ToolTip="External IP" IsEnabled="False" Padding="2" DockPanel.Dock="Bottom" Margin="5" BorderBrush="#CC99B4D1" Click="IPButton_Click" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background>
+                    </Button>
+                    <Image x:Name="ServerImage" DockPanel.Dock="Bottom" Height="64" Width="64" Margin="5" Visibility="Visible"/>
+                    <Button x:Name="ConsoleButton" DockPanel.Dock="Top" IsEnabled="False" Margin="5 5 5 5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="ConsoleButton_Click">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Console
+                    </Button>
+                    <Button x:Name="BackupsButton" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="BackupsButton_Click">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Backups
+                    </Button>
+                    
+                    <Label x:Name="AutoBackupLabel" DockPanel.Dock="Top" HorizontalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GradientInactiveCaptionBrushKey}}">Auto-backup in:</Label>
+                    <Button x:Name="CancelAutoBackup" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="CancelAutoBackup_Click">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Cancel Auto Backup
+                    </Button>
+
+                    <Button x:Name="FixEulaButton" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="FixEulaButton_Click">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Review EULA
+                    </Button>
+                    <Button x:Name="FolderButton" DockPanel.Dock="Top" ToolTip="Open Server Directory" Width="32" Height="32" Margin="2 0" Background="{x:Null}" BorderBrush="{x:Null}" Click="FolderButton_Click">
+                        <Image Source="images/Folder-32.png"/>
+                    </Button>
+                    <Button Margin="5" DockPanel.Dock="Top" Visibility="Collapsed" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Properties
+                    </Button>
+
+                </DockPanel>
+
+                <Grid Grid.Column="1" Grid.Row="1">
+                    <DockPanel x:Name="ConsolePanel" Visibility="Visible">
+                        <TextBox x:Name="ConsoleInput" DockPanel.Dock="Bottom" Height="25" Background="#7F000000" Foreground="White" FontFamily="Lucida Console" Text="" Padding="3 5" TextWrapping="Wrap" KeyDown="ConsoleInput_KeyDown"/>
+                        <TextBox x:Name="ConsoleOutput"  Background="#7F000000" Foreground="White" FontFamily="Lucida Console" Text="" Padding="3 5" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
+
+                    </DockPanel>
+
+                    <DockPanel x:Name="BackupsPanel" Visibility="Collapsed" Background="#7FD7E4F2">
+                        <Grid DockPanel.Dock="Top">
+                            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" DockPanel.Dock="Top" Margin="0 5 0 5">
+                                <Button x:Name="RestoreButton" Content="Restore" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFDDDDFF" IsEnabled="False" Click="RestoreButton_Click"/>
+                                <Button x:Name="BackupButton" Content="Back Up" MinWidth="150" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" Margin="5 0 5 0" VerticalAlignment="Top" Click="BackupButton_Click" Background="#FFDDFFDD"/>
+                                <Button x:Name="DeleteButton" Content="Delete" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFFFDDDD" IsEnabled="False" Click="DeleteButton_Click"/>
+
+                            </StackPanel>
+                        </Grid>
+
+                        <DataGrid x:Name="BackupsDataGrid" DockPanel.Dock="Top" RowBackground="Transparent" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" Background="Transparent" GridLinesVisibility="None" BorderThickness="0" RowHeaderWidth="0" ColumnWidth="*"
+          HorizontalAlignment="Left" VerticalAlignment="Top"
+          EnableRowVirtualization="false" EnableColumnVirtualization="false" 
+          CanUserAddRows="False" CanUserReorderColumns="False" CanUserResizeRows="False" CanUserResizeColumns="False" SelectionChanged="BackupsDataGrid_SelectionChanged" CellEditEnding="BackupsDataGrid_CellEditEnding" AutoGeneratingColumn="BackupsDataGrid_AutoGeneratingColumn" BorderBrush="{x:Null}">
+                            
+                        </DataGrid>
+                    </DockPanel>
+                </Grid>
+            </Grid>
+
+        </DockPanel>
+    </Border>
+</Window>
