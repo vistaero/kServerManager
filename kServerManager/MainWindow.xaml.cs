@@ -1,19 +1,22 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Net.Http;
+using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
-using System.Diagnostics;
-using System.IO.Compression;
-using System.ComponentModel;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Windows.Interop;
 using System.Windows.Controls;
-using System.Net.Sockets;
+using System.Windows.Interop;
 using System.Windows.Media;
-using System.Globalization;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
-using System.Threading;
 
 namespace BackupAndStart
 {
@@ -64,27 +67,28 @@ namespace BackupAndStart
         [DllImport("user32.dll")]
         internal static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
 
+        private static readonly HttpClient httpClient = new();
         readonly static Char directorySeparator = System.IO.Path.DirectorySeparatorChar;
-        string sysFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern;
+        readonly string sysFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern;
 
         Process serverProcess = new Process();
-        String lastPidPath;
+        String lastPidPath = "";
         String latestOutput = "";
 
-        String batPath;
-        String directory;
+        String batPath = "";
+        String directory = "";
         
-        String worldName;
+        String worldName = "";
 
-        String backupsDirectory;
-        BackupFile[] backups;
+        String backupsDirectory = "";
+        BackupFile[] backups = Array.Empty<BackupFile>();
 
-        String eulaPath;
+        String eulaPath = "";
 
         Dictionary<string, string> serverPropertiesDic =
             new Dictionary<string, string>();
 
-        String publicIP;
+        String publicIP = "";
         int port;
 
         public MainWindow()
@@ -97,7 +101,7 @@ namespace BackupAndStart
         {
             EnableBlur();
 
-            directory = System.IO.Path.GetDirectoryName(System.Reflection.Assembly.GetExecutingAssembly().Location);
+            directory = AppContext.BaseDirectory.TrimEnd(directorySeparator);
             backupsDirectory = directory + directorySeparator + "Backups" + directorySeparator;
             lastPidPath = directory + directorySeparator + "lastPid.txt";
             worldName = GetPropertyValue("level-name");
@@ -128,21 +132,17 @@ namespace BackupAndStart
 
         async void GetPublicIP()
         {
-            await Task.Run(() =>
+            while (string.IsNullOrWhiteSpace(publicIP))
             {
-                do
+                try
                 {
-                    try
-                    {
-                        publicIP = new System.Net.WebClient().DownloadString("http://icanhazip.com");
-                    }
-                    catch
-                    {
-
-                    }
-                } while (publicIP == null);
-                
-            });
+                    publicIP = await httpClient.GetStringAsync("https://icanhazip.com");
+                }
+                catch (HttpRequestException)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(1));
+                }
+            }
             String tempIP = "";
             foreach(Char c in publicIP)
             {
@@ -280,6 +280,87 @@ namespace BackupAndStart
             MessageBox.Show("Can't find Java runtime. Please install Java or Minecraft to start a server.", "Can't find runtime", MessageBoxButton.OK, MessageBoxImage.Error);
             return "";
 
+        }
+
+        // ============================================
+        // Find Java Installs
+        // ============================================
+        public static List<(string Name, string Path)> FindJavaInstalls()
+        {
+            List<string> basePaths = new()
+        {
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "Java"
+            ),
+
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "Eclipse Adoptium"
+            ),
+
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "Adoptium"
+            ),
+
+            Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                "Microsoft"
+            )
+        };
+
+            List<(string Name, string Path)> found = new();
+
+            foreach (string basePath in basePaths)
+            {
+                if (!Directory.Exists(basePath))
+                    continue;
+
+                foreach (string dir in Directory.GetDirectories(basePath))
+                {
+                    string javaExe =
+                        Path.Combine(dir, "bin", "java.exe");
+
+                    if (File.Exists(javaExe))
+                    {
+                        found.Add((
+                            Path.GetFileName(dir),
+                            javaExe
+                        ));
+                    }
+                }
+            }
+
+            // Detect Java in PATH
+            try
+            {
+                ProcessStartInfo psi = new()
+                {
+                    FileName = "where",
+                    Arguments = "java",
+                    RedirectStandardOutput = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                };
+
+                using Process process = Process.Start(psi)
+                    ?? throw new InvalidOperationException("Could not start Java discovery.");
+
+                string? output = process.StandardOutput.ReadLine();
+
+                if (!string.IsNullOrWhiteSpace(output))
+                {
+                    found.Add(("JAVA in PATH", output));
+                }
+            }
+            catch
+            {
+            }
+
+            return found
+                .DistinctBy(j => j.Path)
+                .ToList();
         }
 
         internal void EnableBlur()
@@ -428,7 +509,7 @@ namespace BackupAndStart
             
         }
 
-        private void MyProcess_Exited(object sender, System.EventArgs e)
+        private void MyProcess_Exited(object? sender, System.EventArgs e)
         {
             Dispatcher.Invoke(() => UpdateState(false));
         }
@@ -436,10 +517,13 @@ namespace BackupAndStart
         bool savingPendingForBackup;
         public void RunOutPut(object sender, DataReceivedEventArgs e)
         {
-            if (savingPendingForBackup && e.Data.EndsWith("Saved the world"))
+            if (e.Data is not string output)
+                return;
+
+            if (savingPendingForBackup && output.EndsWith("Saved the world"))
                 MakeBackup();
 
-            Dispatcher.Invoke(() => AppendLine(e.Data));
+            Dispatcher.Invoke(() => AppendLine(output));
         }
         
         private void AppendLine(String line)
@@ -490,11 +574,11 @@ namespace BackupAndStart
                 return "";
         }
 
-        DispatcherTimer autoBackupTimer;
+        DispatcherTimer? autoBackupTimer;
 
         private void OptionalBackup()
         {
-            string label = AutoBackupLabel.Content.ToString();
+            string label = AutoBackupLabel.Content?.ToString() ?? "";
             AutoBackupLabel.Content = label + " 10";
             int i = 10;
             //INSTANCIANDO EL TIMER CON LA CLASE DISPATCHERTIMER 
@@ -675,7 +759,9 @@ namespace BackupAndStart
 
         private void RestoreButton_Click(object sender, RoutedEventArgs e)
         {
-            BackupFile selectedBackup = BackupsDataGrid.SelectedItem as BackupFile;
+            if (BackupsDataGrid.SelectedItem is not BackupFile selectedBackup)
+                return;
+
             RestoreBackup(backupsDirectory + directorySeparator + selectedBackup.BackupName + ".zip");
             
             BackupsDataGrid.SelectedIndex = -1;
@@ -807,13 +893,15 @@ namespace BackupAndStart
 
         private void FolderButton_Click(object sender, RoutedEventArgs e)
         {
-            Process.Start(directory);
+            Process.Start(new ProcessStartInfo(directory) { UseShellExecute = true });
         }
 
         private void BackupsDataGrid_CellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
         {
             String oldName = backups[e.Row.GetIndex()].BackupName;
-            var tb = e.EditingElement as System.Windows.Controls.TextBox;
+            if (e.EditingElement is not System.Windows.Controls.TextBox tb)
+                return;
+
             String newName = tb.Text;
             try
             {
@@ -847,8 +935,8 @@ namespace BackupAndStart
                     break;
             }
 
-            if (e.PropertyType == typeof(System.DateTime))
-                (e.Column as DataGridTextColumn).Binding.StringFormat = sysFormat + " HH:mm:ss";
+            if (e.PropertyType == typeof(System.DateTime) && e.Column is DataGridTextColumn column)
+                column.Binding.StringFormat = sysFormat + " HH:mm:ss";
         }
 
         private void IPButton_Click(object sender, RoutedEventArgs e)

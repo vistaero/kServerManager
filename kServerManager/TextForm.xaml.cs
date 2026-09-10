@@ -19,7 +19,7 @@ namespace kServerManager
     /// </summary>
     public partial class TextForm : Window
     {
-        public string returnValue { get; set; }
+        public string returnValue { get; set; } = "";
 
         public TextForm()
         {
