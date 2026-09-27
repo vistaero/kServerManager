@@ -5,8 +5,8 @@ namespace kServerManager.Core;
 public sealed record ServerJarInfo(string Path, int? MinimumJavaMajor)
 {
     public string DisplayName => MinimumJavaMajor is int version
-        ? $"{System.IO.Path.GetFileName(Path)} — Java {version}+"
-        : $"{System.IO.Path.GetFileName(Path)} — Java version unknown";
+        ? Localization.Get("JarDisplayWithJava", System.IO.Path.GetFileName(Path), version)
+        : Localization.Get("JarDisplayJavaUnknown", System.IO.Path.GetFileName(Path));
 }
 
 public static class JavaRequirementDetector
@@ -19,7 +19,28 @@ public static class JavaRequirementDetector
 
         using FileStream file = File.OpenRead(fullPath);
         using var archive = new ZipArchive(file, ZipArchiveMode.Read);
+        minimumJavaMajor = GetMinimumJavaMajor(archive);
+
+        if (IsFabricServerLauncher(archive))
+        {
+            string serverJarPath = Path.Combine(Path.GetDirectoryName(fullPath)!, "server.jar");
+            if (File.Exists(serverJarPath))
+            {
+                using FileStream serverFile = File.OpenRead(serverJarPath);
+                using var serverArchive = new ZipArchive(serverFile, ZipArchiveMode.Read);
+                int? serverJavaMajor = GetMinimumJavaMajor(serverArchive);
+                if (serverJavaMajor is int serverMajor)
+                    minimumJavaMajor = Math.Max(minimumJavaMajor ?? serverMajor, serverMajor);
+            }
+        }
+
+        return new ServerJarInfo(fullPath, minimumJavaMajor);
+    }
+
+    private static int? GetMinimumJavaMajor(ZipArchive archive)
+    {
         Span<byte> header = stackalloc byte[8];
+        int? minimumJavaMajor = null;
         foreach (ZipArchiveEntry entry in archive.Entries)
         {
             if (!entry.FullName.EndsWith(".class", StringComparison.OrdinalIgnoreCase) ||
@@ -40,7 +61,28 @@ public static class JavaRequirementDetector
             minimumJavaMajor = Math.Max(minimumJavaMajor ?? javaMajor, javaMajor);
         }
 
-        return new ServerJarInfo(fullPath, minimumJavaMajor);
+        return minimumJavaMajor;
+    }
+
+    private static bool IsFabricServerLauncher(ZipArchive archive)
+    {
+        ZipArchiveEntry? manifest = archive.GetEntry("META-INF/MANIFEST.MF");
+        ZipArchiveEntry? launcherProperties = archive.GetEntry("fabric-server-launch.properties");
+        if (manifest is null || launcherProperties is null)
+            return false;
+
+        using Stream manifestStream = manifest.Open();
+        using var reader = new StreamReader(manifestStream);
+        string? line;
+        while ((line = reader.ReadLine()) is not null)
+        {
+            if (line.Equals(
+                    "Main-Class: net.fabricmc.loader.impl.launch.server.FabricServerLauncher",
+                    StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
     }
 
     private static bool IsMultiReleaseEntry(string entryName) =>
