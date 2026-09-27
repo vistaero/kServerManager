@@ -21,7 +21,7 @@ public sealed class JdkInstaller
     public async Task<string> InstallAsync(int majorVersion, string? installDirectory = null, CancellationToken cancellationToken = default)
     {
         if (majorVersion < 1)
-            throw new ArgumentOutOfRangeException(nameof(majorVersion), "The JDK version must be a positive integer.");
+            throw new ArgumentOutOfRangeException(nameof(majorVersion), Localization.Get("JdkVersionPositive"));
 
         string installRoot = Path.GetFullPath(installDirectory ?? DefaultInstallDirectory);
         string javaName = OperatingSystem.IsWindows() ? "java.exe" : "java";
@@ -36,7 +36,7 @@ public sealed class JdkInstaller
             return cachedJava;
 
         if (Directory.Exists(cachedHome))
-            throw new IOException($"The JDK cache folder exists but does not contain a valid JDK {majorVersion}: {cachedHome}");
+            throw new IOException(Localization.Get("JdkCacheInvalid", majorVersion, cachedHome));
 
         string operatingSystem = GetAdoptiumOperatingSystem();
         string architecture = RuntimeInformation.OSArchitecture == Architecture.Arm64 ? "aarch64" : "x64";
@@ -79,7 +79,7 @@ public sealed class JdkInstaller
                 .FirstOrDefault(path => Path.GetFileName(Path.GetDirectoryName(path)) == "bin");
 
             if (downloadedJava is null || await GetJavaMajorAsync(downloadedJava, cancellationToken) != majorVersion)
-                throw new InvalidDataException($"Downloaded JDK {majorVersion} does not contain a working Java executable of that version.");
+                throw new InvalidDataException(Localization.Get("DownloadedJdkInvalid", majorVersion));
 
             string downloadedHome = Directory.GetParent(Path.GetDirectoryName(downloadedJava)!)!.FullName;
             Directory.Move(downloadedHome, cachedHome);

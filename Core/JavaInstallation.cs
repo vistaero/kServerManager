@@ -2,7 +2,7 @@ namespace kServerManager.Core;
 
 public sealed record JavaInstallation(string Name, string Path)
 {
-    public override string ToString() => $"{Name} — {Path}";
+    public override string ToString() => Localization.Get("JdkDisplayName", Name, Path);
 }
 
 public static class JavaInstallationFinder

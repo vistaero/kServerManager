@@ -5,24 +5,25 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
         xmlns:local="clr-namespace:BackupAndStart"
+        xmlns:loc="clr-namespace:kServerManager.Properties"
         mc:Ignorable="d"
-        Title="EULA" Height="600" Width="1000" MinHeight="400" MinWidth="600"
+        Title="{loc:Text Eula}" Height="600" Width="1000" MinHeight="400" MinWidth="600"
         ShowInTaskbar="False" WindowStartupLocation="CenterScreen" Loaded="EulaWindow_Loaded">
     <DockPanel>
-        <Label DockPanel.Dock="Top" FontSize="18" Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}">Do you agree Minecraft EULA?</Label>
-        <Button x:Name="OpenEulaInBrowserButton" Content="Open EULA in browser" IsEnabled="False"
+        <Label DockPanel.Dock="Top" FontSize="18" Foreground="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}" Content="{loc:Text AgreeMinecraftEula}"/>
+        <Button x:Name="OpenEulaInBrowserButton" Content="{loc:Text OpenEulaInBrowser}" IsEnabled="False"
                 DockPanel.Dock="Top" HorizontalAlignment="Left" Margin="5" Padding="8,3"
                 Click="OpenEulaInBrowserButton_Click"/>
         <Button x:Name="AgreeButton" IsEnabled="False" DockPanel.Dock="Top" HorizontalContentAlignment="Left" Background="#FFDDFFDD" Margin="5" Click="AgreeButton_Click">
             <StackPanel>
-                <Label FontSize="18">Yes. I have read it and I agree with the terms.</Label>
-                <Label>Required to start server.</Label>
+                <Label FontSize="18" Content="{loc:Text AgreeEula}"/>
+                <Label Content="{loc:Text EulaRequiredToStart}"/>
             </StackPanel>
         </Button>
         <Button x:Name="DenyButton" DockPanel.Dock="Top" HorizontalContentAlignment="Left" Background="#FFFFDDDD" Margin="5" Click="DenyButton_Click">
             <StackPanel>
-                <Label FontSize="18">No. I can't read it right now or I do not agree with the terms.</Label>
-                <Label>The server won't start. You can agree later.</Label>
+                <Label FontSize="18" Content="{loc:Text DenyEula}"/>
+                <Label Content="{loc:Text EulaCanAgreeLater}"/>
             </StackPanel>
         </Button>
         <TextBlock x:Name="EulaStatusTextBlock" DockPanel.Dock="Bottom" Margin="8,2,8,6"

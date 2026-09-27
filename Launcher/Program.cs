@@ -25,7 +25,7 @@ internal static class Program
                 return 0;
             }
 
-            Console.Error.WriteLine($"Unknown command: {args[0]}");
+            Console.Error.WriteLine(Localization.Get("UnknownCommand", args[0]));
             ShowHelp();
             return 2;
         }
@@ -36,12 +36,12 @@ internal static class Program
 
     private static void ShowHelp()
     {
-        Console.WriteLine("kServerManager.Launcher");
-        Console.WriteLine("  (no arguments)                    Open the Minecraft server menu");
-        Console.WriteLine("  install-jdks [versions] [--output-directory path]");
-        Console.WriteLine("  install-jdks --jdk-versions 8 17 [--output-directory path]");
-        Console.WriteLine("                                    Download Eclipse Temurin JDKs for this OS");
-        Console.WriteLine("                                    Defaults: prompt; blank input installs 8 17 21 25");
+        Console.WriteLine(Localization.Get("LauncherName"));
+        Console.WriteLine(Localization.Get("HelpNoArgs"));
+        Console.WriteLine(Localization.Get("HelpInstallJdks"));
+        Console.WriteLine(Localization.Get("HelpInstallJdksFlags"));
+        Console.WriteLine(Localization.Get("HelpDownloadJdks"));
+        Console.WriteLine(Localization.Get("HelpDefaultJdks"));
     }
 
     private static async Task<int> InstallJdksCommandAsync(string[] args)
@@ -56,7 +56,7 @@ internal static class Program
             {
                 if (++i >= args.Length)
                 {
-                    Console.Error.WriteLine("--output requires a directory path.");
+                    Console.Error.WriteLine(Localization.Get("OutputPathRequired"));
                     return 2;
                 }
                 installDirectory = Path.GetFullPath(args[i]);
@@ -70,7 +70,7 @@ internal static class Program
                     i++;
                 if (firstVersion == i)
                 {
-                    Console.Error.WriteLine("--jdk-versions requires at least one version.");
+                    Console.Error.WriteLine(Localization.Get("JdkVersionsRequired"));
                     return 2;
                 }
                 i--;
@@ -78,7 +78,7 @@ internal static class Program
                 {
                     if (!int.TryParse(args[versionIndex], out int jdkMajor) || jdkMajor < 1)
                     {
-                        Console.Error.WriteLine($"Invalid JDK major version: {args[versionIndex]}");
+                        Console.Error.WriteLine(Localization.Get("InvalidJdkVersion", args[versionIndex]));
                         return 2;
                     }
                     versions.Add(jdkMajor);
@@ -88,7 +88,7 @@ internal static class Program
 
             if (!int.TryParse(args[i], out int version) || version < 1)
             {
-                Console.Error.WriteLine($"Invalid JDK major version: {args[i]}");
+                Console.Error.WriteLine(Localization.Get("InvalidJdkVersion", args[i]));
                 return 2;
             }
 
@@ -97,7 +97,7 @@ internal static class Program
 
         if (versions.Count == 0)
         {
-            Console.Write("JDK versions to install [8 17 21 25]: ");
+            Console.Write(Localization.Get("PromptJdkVersions"));
             string? input = Console.ReadLine();
             if (!string.IsNullOrWhiteSpace(input))
             {
@@ -105,7 +105,7 @@ internal static class Program
                 {
                     if (!int.TryParse(part, out int version) || version < 1)
                     {
-                        Console.Error.WriteLine("Enter positive JDK major versions, for example: 8 17 21 25 26.");
+                        Console.Error.WriteLine(Localization.Get("PositiveJdkVersions"));
                         return 2;
                     }
                     versions.Add(version);
@@ -122,11 +122,11 @@ internal static class Program
 
     private static async Task<int> InstallJdkVersionsAsync(IEnumerable<int> versions, string installDirectory)
     {
-        Console.WriteLine($"Installing under: {Path.GetFullPath(installDirectory)}");
+        Console.WriteLine(Localization.Get("InstallingUnder", Path.GetFullPath(installDirectory)));
         var results = new List<(int Version, string? JavaPath, Exception? Error)>();
         foreach (int version in versions.Distinct())
         {
-            Console.WriteLine($"JDK {version}: checking existing installations or downloading...");
+            Console.WriteLine(Localization.Get("JdkCheckDownload", version));
             try
             {
                 string javaPath = await JdkInstaller.InstallAsync(version, installDirectory);
@@ -141,9 +141,9 @@ internal static class Program
         foreach ((int version, string? javaPath, Exception? error) in results)
         {
             if (error is null)
-                Console.WriteLine($"JDK {version}: {Path.GetDirectoryName(Path.GetDirectoryName(javaPath)!)!}");
+                Console.WriteLine(Localization.Get("JdkInstalledPath", version, Path.GetDirectoryName(Path.GetDirectoryName(javaPath)!)!));
             else
-                Console.Error.WriteLine($"JDK {version}: {error.Message}");
+                Console.Error.WriteLine(Localization.Get("JdkFailed", version, error.Message));
         }
 
         return results.Any(result => result.Error is not null) ? 1 : 0;
@@ -159,7 +159,7 @@ internal static class Program
 
             if (choice is null)
             {
-                Console.Write("Select an option: ");
+                Console.Write(Localization.Get("SelectOption"));
                 choice = Console.ReadLine();
             }
 
@@ -188,7 +188,7 @@ internal static class Program
                     await InstallFromMenuAsync();
                     break;
                 default:
-                    Console.WriteLine("[X] Invalid input.");
+                    Console.WriteLine(Localization.Get("InvalidInput"));
                     await Task.Delay(TimeSpan.FromSeconds(1));
                     break;
             }
@@ -199,30 +199,30 @@ internal static class Program
     {
         Console.Clear();
         Console.WriteLine("======================================");
-        Console.WriteLine("   Minecraft Server Launcher");
+        Console.WriteLine(Localization.Get("LauncherTitle"));
         Console.WriteLine("======================================");
-        Console.WriteLine($" Current Java : {DisplayJavaPath(_config.JavaPath)}");
-        Console.WriteLine($" Current Jar  : {DisplayJarPath(_config.JarPath)}");
-        Console.WriteLine($" Max Memory   : {_config.MaxMemoryGB}G");
+        Console.WriteLine(Localization.Get("CurrentJava", DisplayJavaPath(_config.JavaPath)));
+        Console.WriteLine(Localization.Get("CurrentJar", DisplayJarPath(_config.JarPath)));
+        Console.WriteLine(Localization.Get("CurrentMemory", _config.MaxMemoryGB));
         Console.WriteLine();
-        Console.WriteLine("1. Start Server");
-        Console.WriteLine("2. Change server .jar");
-        Console.WriteLine("3. Change Java version");
-        Console.WriteLine("4. Change maximum memory");
-        Console.WriteLine("5. Sync with Pi");
-        Console.WriteLine("6. Download JDK versions");
+        Console.WriteLine(Localization.Get("MenuStartServer"));
+        Console.WriteLine(Localization.Get("MenuChangeJar"));
+        Console.WriteLine(Localization.Get("MenuChangeJava"));
+        Console.WriteLine(Localization.Get("MenuChangeMemory"));
+        Console.WriteLine(Localization.Get("MenuSyncPi"));
+        Console.WriteLine(Localization.Get("MenuInstallJdks"));
         Console.WriteLine();
     }
 
     private static string DisplayJavaPath(string? path) =>
-        string.IsNullOrWhiteSpace(path) ? "<not set>" : Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path))) ?? path;
+        string.IsNullOrWhiteSpace(path) ? Localization.Get("NotSet") : Path.GetFileName(Path.GetDirectoryName(Path.GetDirectoryName(path))) ?? path;
 
     private static string DisplayJarPath(string? path) =>
-        string.IsNullOrWhiteSpace(path) ? "<not set>" : Path.GetFileName(path) ?? path;
+        string.IsNullOrWhiteSpace(path) ? Localization.Get("NotSet") : Path.GetFileName(path) ?? path;
 
     private static async Task<char?> WaitForMenuSelectionAsync()
     {
-        Console.WriteLine("[INFO] Option 1 will run automatically in 5 seconds. Press any key to cancel.");
+        Console.WriteLine(Localization.Get("AutoStartCountdown"));
         if (!TryFlushPendingKeys())
         {
             await Task.Delay(TimeSpan.FromSeconds(5));
@@ -231,7 +231,7 @@ internal static class Program
 
         for (int remaining = 5; remaining > 0; remaining--)
         {
-            Console.WriteLine($"  {remaining}...");
+            Console.WriteLine(Localization.Get("Countdown", remaining));
             for (int tenth = 0; tenth < 10; tenth++)
             {
                 try
@@ -241,11 +241,11 @@ internal static class Program
                         ConsoleKeyInfo key = Console.ReadKey(intercept: true);
                         if (key.KeyChar is >= '0' and <= '9')
                         {
-                            Console.WriteLine($"[INPUT] {key.KeyChar}");
+                            Console.WriteLine(Localization.Get("InputKey", key.KeyChar));
                             return key.KeyChar;
                         }
 
-                        Console.WriteLine("[INFO] Automatic start canceled.");
+                        Console.WriteLine(Localization.Get("AutoStartCanceled"));
                         return null;
                     }
                 }
@@ -259,7 +259,7 @@ internal static class Program
             }
         }
 
-        Console.WriteLine("[AUTO] Starting server...");
+        Console.WriteLine(Localization.Get("AutoStart"));
         return '1';
     }
 
@@ -286,7 +286,7 @@ internal static class Program
 
         if (jars.Length == 0)
         {
-            Console.WriteLine("[X] No .jar files found in this folder.");
+            Console.WriteLine(Localization.Get("NoJarFiles"));
             return false;
         }
 
@@ -294,24 +294,24 @@ internal static class Program
         {
             _config.JarPath = jars[0].FullName;
             SaveConfig();
-            Console.WriteLine($"[OK] Using server jar: {jars[0].Name}");
+            Console.WriteLine(Localization.Get("UsingServerJar", jars[0].Name));
             return true;
         }
 
-        Console.WriteLine("Detected several .jar files:");
+        Console.WriteLine(Localization.Get("SeveralJarFiles"));
         for (int i = 0; i < jars.Length; i++)
-            Console.WriteLine($"  [{i + 1}] {jars[i].Name}");
+            Console.WriteLine(Localization.Get("JarChoice", i + 1, jars[i].Name));
 
-        int? choice = ReadNumber("Enter the number of the server to use: ", 1, jars.Length);
+        int? choice = ReadNumber(Localization.Get("SelectServerNumber"), 1, jars.Length);
         if (choice is null)
         {
-            Console.WriteLine("[X] Invalid input.");
+            Console.WriteLine(Localization.Get("InvalidInput"));
             return false;
         }
 
         _config.JarPath = jars[choice.Value - 1].FullName;
         SaveConfig();
-        Console.WriteLine($"[OK] Server jar saved: {Path.GetFileName(_config.JarPath)}");
+        Console.WriteLine(Localization.Get("ServerJarSaved", Path.GetFileName(_config.JarPath)));
         return true;
     }
 
@@ -320,48 +320,48 @@ internal static class Program
         IReadOnlyList<JavaInstallation> installs = JavaInstallationFinder.Find();
         if (installs.Count == 0)
         {
-            Console.WriteLine("[X] No Java installations detected.");
+            Console.WriteLine(Localization.Get("NoJavaInstallations"));
             return false;
         }
 
-        Console.WriteLine("Detected the following JDKs:");
+        Console.WriteLine(Localization.Get("DetectedJdks"));
         for (int i = 0; i < installs.Count; i++)
-            Console.WriteLine($" [{i + 1}] {installs[i].Name} -> {installs[i].Path}");
+            Console.WriteLine(Localization.Get("JdkChoice", i + 1, installs[i].Name, installs[i].Path));
 
-        int? choice = ReadNumber("Select the JDK to use by default: ", 1, installs.Count);
+        int? choice = ReadNumber(Localization.Get("SelectDefaultJdk"), 1, installs.Count);
         if (choice is null)
         {
-            Console.WriteLine("[X] Invalid input.");
+            Console.WriteLine(Localization.Get("InvalidInput"));
             return false;
         }
 
         _config.JavaPath = installs[choice.Value - 1].Path;
         SaveConfig();
-        Console.WriteLine("[OK] Java saved.");
-        Console.WriteLine($"[OK] Java selected: {_config.JavaPath}");
+        Console.WriteLine(Localization.Get("JavaSaved"));
+        Console.WriteLine(Localization.Get("JavaSelected", _config.JavaPath));
         await Task.CompletedTask;
         return true;
     }
 
     private static bool SetMaximumMemory()
     {
-        Console.Write("Enter maximum memory in GB (example: 8): ");
+        Console.Write(Localization.Get("EnterMaxMemory"));
         if (!int.TryParse(Console.ReadLine(), out int memory) || memory < 1)
         {
-            Console.WriteLine("[X] Invalid input.");
+            Console.WriteLine(Localization.Get("InvalidInput"));
             return false;
         }
 
         _config.MaxMemoryGB = memory;
         SaveConfig();
-        Console.WriteLine("[OK] Maximum memory saved.");
-        Console.WriteLine($"[OK] Max memory set to {memory}G");
+        Console.WriteLine(Localization.Get("MemorySaved"));
+        Console.WriteLine(Localization.Get("MemorySet", memory));
         return true;
     }
 
     private static async Task InstallFromMenuAsync()
     {
-        Console.Write("JDK versions to install [8 17 21 25]: ");
+        Console.Write(Localization.Get("PromptJdkVersions"));
         string? input = Console.ReadLine();
         int[] versions;
 
@@ -377,7 +377,7 @@ internal static class Program
             {
                 if (!int.TryParse(part, out int version) || version < 1)
                 {
-                    Console.WriteLine("Enter positive JDK major versions, for example: 8 17 21 25 26.");
+                    Console.WriteLine(Localization.Get("PositiveJdkVersions"));
                     return;
                 }
                 parsed.Add(version);
@@ -387,7 +387,7 @@ internal static class Program
 
         int result = await InstallJdkVersionsAsync(versions, JdkInstaller.DefaultInstallDirectory);
         if (result != 0)
-            Console.WriteLine("Some JDK versions could not be installed.");
+            Console.WriteLine(Localization.Get("JdkInstallFailed"));
         WaitForEnter();
     }
 
@@ -395,7 +395,7 @@ internal static class Program
     {
         if (string.IsNullOrWhiteSpace(_config.JavaPath) || !File.Exists(_config.JavaPath))
         {
-            Console.WriteLine("[INFO] Java not configured or invalid.");
+            Console.WriteLine(Localization.Get("JavaMissingInvalid"));
             if (!await SelectJavaAsync())
             {
                 WaitForEnter();
@@ -405,7 +405,7 @@ internal static class Program
 
         if (string.IsNullOrWhiteSpace(_config.JarPath) || !File.Exists(_config.JarPath))
         {
-            Console.WriteLine("[INFO] Server .jar not configured or invalid.");
+            Console.WriteLine(Localization.Get("JarMissingInvalid"));
             if (!SelectJar())
             {
                 WaitForEnter();
@@ -421,15 +421,15 @@ internal static class Program
 
         Console.Clear();
         Console.WriteLine("======================================");
-        Console.WriteLine("   Minecraft Server Launcher");
+        Console.WriteLine(Localization.Get("LauncherTitle"));
         Console.WriteLine("======================================");
         string javaPath = _config.JavaPath!;
         string jarPath = _config.JarPath!;
-        Console.WriteLine($" Java : {javaPath}");
-        Console.WriteLine($" Jar  : {Path.GetFileName(jarPath)}");
-        Console.WriteLine($" RAM  : {_config.MaxMemoryGB}G");
+        Console.WriteLine(Localization.Get("JavaPathLabel", javaPath));
+        Console.WriteLine(Localization.Get("JarPathLabel", Path.GetFileName(jarPath)));
+        Console.WriteLine(Localization.Get("RamLabel", _config.MaxMemoryGB));
         Console.WriteLine();
-        Console.WriteLine($"[>>] Running {Path.GetFileName(jarPath)} ...");
+        Console.WriteLine(Localization.Get("RunningJar", Path.GetFileName(jarPath)));
         Console.WriteLine();
 
         var startInfo = ServerProcessFactory.CreateStartInfo(_config, ServerDirectory);
@@ -437,24 +437,24 @@ internal static class Program
         try
         {
             using Process process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("Java process did not start.");
+                ?? throw new InvalidOperationException(Localization.Get("JavaProcessNotStarted"));
             await process.WaitForExitAsync();
             Console.WriteLine();
-            Console.WriteLine("[INFO] Server stopped correctly.");
+            Console.WriteLine(Localization.Get("ServerStoppedCorrectly"));
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException or IOException)
         {
-            Console.WriteLine($"[X] Failed to start server: {error.Message}");
+            Console.WriteLine(Localization.Get("StartServerFailed", error.Message));
             WaitForEnter();
             return;
         }
 
-        await WaitForCountdownOrKeyAsync(5, "[INFO] Returning to menu in 5 seconds. Press any key to cancel return.");
+        await WaitForCountdownOrKeyAsync(5, Localization.Get("ReturnMenuCountdown"));
     }
 
     private static void SyncWithPi()
     {
-        Console.Write("Do you want to sync with Pi now? (y/n): ");
+        Console.Write(Localization.Get("SyncQuestion"));
         string? answer = Console.ReadLine();
         if (string.IsNullOrWhiteSpace(answer) || char.ToLowerInvariant(answer[0]) is not ('s' or 'y'))
             return;
@@ -466,19 +466,19 @@ internal static class Program
             local.Equals(windowsDirectory, StringComparison.OrdinalIgnoreCase) ||
             local.StartsWith(windowsDirectory + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
-            Console.WriteLine($"[X] Security: local path points to {local}. Aborting sync.");
+            Console.WriteLine(Localization.Get("SyncSecurity", local));
             return;
         }
 
         const string remote = "vistaero@192.168.18.22:/home/vistaero/MinecraftServer";
         string sshKey = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".ssh", "id_ed25519");
-        Console.WriteLine($"  Local : {local}");
-        Console.WriteLine($"  Remote: {remote}");
+        Console.WriteLine(Localization.Get("LocalPath", local));
+        Console.WriteLine(Localization.Get("RemotePath", remote));
 
         string[] entries = Directory.GetFileSystemEntries(local);
         if (entries.Length == 0)
         {
-            Console.WriteLine("[INFO] There are no files to sync.");
+            Console.WriteLine(Localization.Get("NoFilesToSync"));
             return;
         }
 
@@ -497,18 +497,18 @@ internal static class Program
 
         try
         {
-            Console.WriteLine("  Syncing...");
+            Console.WriteLine(Localization.Get("Syncing"));
             using Process process = Process.Start(startInfo)
-                ?? throw new InvalidOperationException("scp process did not start.");
+                ?? throw new InvalidOperationException(Localization.Get("ScpNotStarted"));
             process.WaitForExit();
             if (process.ExitCode != 0)
-                Console.WriteLine($"[X] Error syncing files. Code: {process.ExitCode}");
+                Console.WriteLine(Localization.Get("SyncErrorCode", process.ExitCode));
             else
-                Console.WriteLine("[OK] Sync completed.");
+                Console.WriteLine(Localization.Get("SyncCompleted"));
         }
         catch (Exception error) when (error is Win32Exception or InvalidOperationException or IOException)
         {
-            Console.WriteLine($"[X] Error syncing files. {error.Message}");
+            Console.WriteLine(Localization.Get("SyncFailed", error.Message));
         }
     }
 
@@ -523,7 +523,7 @@ internal static class Program
 
         for (int remaining = seconds; remaining > 0; remaining--)
         {
-            Console.WriteLine($"  {remaining}...");
+            Console.WriteLine(Localization.Get("Countdown", remaining));
             for (int tenth = 0; tenth < 10; tenth++)
             {
                 try
@@ -531,7 +531,7 @@ internal static class Program
                     if (Console.KeyAvailable)
                     {
                         _ = Console.ReadKey(intercept: true);
-                        Console.WriteLine("[INFO] Auto-return canceled. Press any key to return to menu.");
+                        Console.WriteLine(Localization.Get("AutoReturnCanceled"));
                         WaitForKey();
                         return;
                     }
@@ -560,7 +560,7 @@ internal static class Program
 
     private static void WaitForEnter()
     {
-        Console.Write("Press Enter to return to the menu");
+        Console.Write(Localization.Get("PressEnterToMenu"));
         _ = Console.ReadLine();
     }
 

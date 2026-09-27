@@ -8,11 +8,11 @@ public static class ServerProcessFactory
     {
         ArgumentNullException.ThrowIfNull(config);
         if (string.IsNullOrWhiteSpace(config.JavaPath))
-            throw new InvalidOperationException("Java is not configured.");
+            throw new InvalidOperationException(Localization.Get("JavaNotConfigured"));
         if (string.IsNullOrWhiteSpace(config.JarPath))
-            throw new InvalidOperationException("The server JAR is not configured.");
+            throw new InvalidOperationException(Localization.Get("ServerJarNotConfigured"));
         if (config.MaxMemoryGB < 1)
-            throw new InvalidOperationException("Maximum memory must be at least 1 GB.");
+            throw new InvalidOperationException(Localization.Get("MinimumMemory"));
 
         var startInfo = new ProcessStartInfo
         {

@@ -4,11 +4,15 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupAndStart"
+        xmlns:loc="clr-namespace:kServerManager.Properties"
         mc:Ignorable="d"
-        Title="kServer Manager" Height="375" Width="685" MinHeight="300" MinWidth="580"
+        Title="{loc:Text Title}" Height="375" Width="685" MinHeight="300" MinWidth="580"
         AllowsTransparency="True" ResizeMode="CanResize" WindowStyle="None" WindowStartupLocation="CenterScreen"
         Background="{x:Null}" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized"
         BorderBrush="Black" Closing="Window_Closing" StateChanged="Window_StateChanged">
+    <Window.Resources>
+        <loc:ServerJarDisplayNameConverter x:Key="ServerJarDisplayNameConverter"/>
+    </Window.Resources>
     <Border BorderBrush="#FF00C5FF" BorderThickness="1">
 
         <DockPanel>
@@ -42,7 +46,7 @@
 
                 </Button>
                 <Button x:Name="MaximizeRestoreButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Width="21" Click="MaximizeRestoreButton_Click"
-                        ToolTip="Maximize">
+                        ToolTip="{loc:Text Maximize}">
                     <Button.Style>
                         <Style TargetType="{x:Type Button}">
                             <Setter Property="Background" Value="PaleTurquoise"/>
@@ -94,7 +98,7 @@
                     <TextBlock Text="_" FontFamily="Calibri" Margin="0 -3 0 0" FontSize="16" Foreground="White"/>
 
                 </Button>
-                <Label x:Name="TitleLabel" Margin="1,1,1,1.4" DockPanel.Dock="Left" Content="kServer Manager">
+                <Label x:Name="TitleLabel" Margin="1,1,1,1.4" DockPanel.Dock="Left" Content="{loc:Text Title}">
                     <Label.Effect>
                         <DropShadowEffect ShadowDepth="1" Color="White"/>
                     </Label.Effect>
@@ -110,15 +114,15 @@
 
                 <DockPanel Grid.Row="1" Grid.Column="0" Background="#7F0078D7">
                     <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Center">
-                        <Button x:Name="StartButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StartButton_Click">
+                        <Button x:Name="StartButton" Content="{loc:Text Start}" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StartButton_Click">
                             <Button.Foreground>
                                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                                     <GradientStop Color="#FF0C8100" Offset="0"/>
                                     <GradientStop Color="#FF0E9B00" Offset="1"/>
                                 </LinearGradientBrush>
-                            </Button.Foreground> Start
+                            </Button.Foreground>
                         </Button>
-                        <Button x:Name="StopButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StopButton_Click">
+                        <Button x:Name="StopButton" Content="{loc:Text Stop}" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="StopButton_Click">
                             <Button.Foreground>
                                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                                     <GradientStop Color="#FF810000" Offset="0"/>
@@ -126,18 +130,17 @@
                                 </LinearGradientBrush>
                             </Button.Foreground>
 
-                            Stop
                         </Button>
-                        <Button x:Name="RestartButton" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="RestartButton_Click">
+                        <Button x:Name="RestartButton" Content="{loc:Text Restart}" Padding="7 3" Height="24" Margin="5" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Background="#FFF0F0F0" Click="RestartButton_Click">
                             <Button.Foreground>
                                 <LinearGradientBrush EndPoint="0.5,1" StartPoint="0.5,0">
                                     <GradientStop Color="#FFCD8200" Offset="0"/>
                                     <GradientStop Color="#FFFF9700" Offset="1"/>
                                 </LinearGradientBrush>
-                            </Button.Foreground> Restart
+                            </Button.Foreground>
                         </Button>
                     </StackPanel>
-                    <Button x:Name="IPButton" Content="Fetching IP Address" ToolTip="External IP" IsEnabled="False" Padding="2" DockPanel.Dock="Bottom" Margin="5" BorderBrush="#CC99B4D1" Click="IPButton_Click" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}">
+                    <Button x:Name="IPButton" Content="{loc:Text FetchingIpAddress}" ToolTip="{loc:Text ExternalIp}" IsEnabled="False" Padding="2" DockPanel.Dock="Bottom" Margin="5" BorderBrush="#CC99B4D1" Click="IPButton_Click" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
@@ -146,60 +149,60 @@
                         </Button.Background>
                     </Button>
                     <Image x:Name="ServerImage" DockPanel.Dock="Bottom" Height="64" Width="64" Margin="5" Visibility="Visible"/>
-                    <Button x:Name="ConsoleButton" DockPanel.Dock="Top" IsEnabled="False" Margin="5 5 5 5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="ConsoleButton_Click">
+                    <Button x:Name="ConsoleButton" Content="{loc:Text Console}" DockPanel.Dock="Top" IsEnabled="False" Margin="5 5 5 5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="ConsoleButton_Click">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Console
+                        </Button.Background>
                     </Button>
-                    <Button x:Name="BackupsButton" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="BackupsButton_Click">
+                    <Button x:Name="BackupsButton" Content="{loc:Text Backups}" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="BackupsButton_Click">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Backups
+                        </Button.Background>
                     </Button>
 
-                    <Button x:Name="RefreshJarsButton" DockPanel.Dock="Top" Margin="5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="RefreshServerJars_Click">
+                    <Button x:Name="RefreshJarsButton" Content="{loc:Text RefreshJars}" DockPanel.Dock="Top" Margin="5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="RefreshServerJars_Click">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Refresh JARs
+                        </Button.Background>
                     </Button>
                     
-                    <Label x:Name="AutoBackupLabel" DockPanel.Dock="Top" HorizontalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GradientInactiveCaptionBrushKey}}">Auto-backup in:</Label>
-                    <Button x:Name="CancelAutoBackup" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="CancelAutoBackup_Click">
+                    <Label x:Name="AutoBackupLabel" Content="{loc:Text AutoBackupIn}" DockPanel.Dock="Top" HorizontalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GradientInactiveCaptionBrushKey}}"/>
+                    <Button x:Name="CancelAutoBackup" Content="{loc:Text CancelAutoBackup}" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="CancelAutoBackup_Click">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Cancel Auto Backup
+                        </Button.Background>
                     </Button>
 
-                    <Button x:Name="FixEulaButton" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="FixEulaButton_Click">
+                    <Button x:Name="FixEulaButton" Content="{loc:Text ReviewEula}" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="FixEulaButton_Click">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Review EULA
+                        </Button.Background>
                     </Button>
-                    <Button x:Name="FolderButton" DockPanel.Dock="Top" ToolTip="Open Server Directory" Width="32" Height="32" Margin="2 0" Background="{x:Null}" BorderBrush="{x:Null}" Click="FolderButton_Click">
+                    <Button x:Name="FolderButton" DockPanel.Dock="Top" ToolTip="{loc:Text OpenServerDirectory}" Width="32" Height="32" Margin="2 0" Background="{x:Null}" BorderBrush="{x:Null}" Click="FolderButton_Click">
                         <Image Source="images/Folder-32.png"/>
                     </Button>
-                    <Button Margin="5" DockPanel.Dock="Top" Visibility="Collapsed" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}">
+                    <Button Content="{loc:Text Properties}" Margin="5" DockPanel.Dock="Top" Visibility="Collapsed" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}">
                         <Button.Background>
                             <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
                                 <GradientStop Color="#FFEAEAEA"/>
                                 <GradientStop Color="White" Offset="1"/>
                             </LinearGradientBrush>
-                        </Button.Background> Properties
+                        </Button.Background>
                     </Button>
 
                 </DockPanel>
@@ -210,11 +213,17 @@
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
                     <StackPanel Grid.Row="0" Margin="8,5,8,4">
-                        <TextBlock Text="Server JAR" FontWeight="SemiBold" Margin="0,0,0,3"/>
-                        <ComboBox x:Name="ServerJarComboBox" Height="27" DisplayMemberPath="DisplayName"
-                                  SelectionChanged="ServerJarComboBox_SelectionChanged"/>
+                        <TextBlock Text="{loc:Text ServerJar}" FontWeight="SemiBold" Margin="0,0,0,3" Foreground="DimGray"/>
+                        <ComboBox x:Name="ServerJarComboBox" Height="27"
+                                  SelectionChanged="ServerJarComboBox_SelectionChanged">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding Converter={StaticResource ServerJarDisplayNameConverter}}"/>
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
                         <TextBlock x:Name="JavaRequirementTextBlock" Margin="0,3,0,0" Foreground="DimGray"
-                                   Text="Select a server JAR to inspect its Java requirement." TextTrimming="CharacterEllipsis"/>
+                                   Text="{loc:Text SelectServerJar}" TextTrimming="CharacterEllipsis"/>
                     </StackPanel>
                     <DockPanel x:Name="ConsolePanel" Grid.Row="1" Visibility="Visible">
                         <TextBox x:Name="ConsoleInput" DockPanel.Dock="Bottom" Height="25" Background="#7F000000" Foreground="White" FontFamily="Lucida Console" Text="" Padding="3 5" TextWrapping="Wrap" KeyDown="ConsoleInput_KeyDown"/>
@@ -225,9 +234,9 @@
                     <DockPanel x:Name="BackupsPanel" Grid.Row="1" Visibility="Collapsed" Background="#7FD7E4F2">
                         <Grid DockPanel.Dock="Top">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" DockPanel.Dock="Top" Margin="0 5 0 5">
-                                <Button x:Name="RestoreButton" Content="Restore" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFDDDDFF" IsEnabled="False" Click="RestoreButton_Click"/>
-                                <Button x:Name="BackupButton" Content="Back Up" MinWidth="150" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" Margin="5 0 5 0" VerticalAlignment="Top" Click="BackupButton_Click" Background="#FFDDFFDD"/>
-                                <Button x:Name="DeleteButton" Content="Delete" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFFFDDDD" IsEnabled="False" Click="DeleteButton_Click"/>
+                                <Button x:Name="RestoreButton" Content="{loc:Text Restore}" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFDDDDFF" IsEnabled="False" Click="RestoreButton_Click"/>
+                                <Button x:Name="BackupButton" Content="{loc:Text BackUp}" MinWidth="150" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" Margin="5 0 5 0" VerticalAlignment="Top" Click="BackupButton_Click" Background="#FFDDFFDD"/>
+                                <Button x:Name="DeleteButton" Content="{loc:Text Delete}" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFFFDDDD" IsEnabled="False" Click="DeleteButton_Click"/>
 
                             </StackPanel>
                         </Grid>

@@ -9,4 +9,10 @@
     <RootNamespace>kServerManager.Core</RootNamespace>
   </PropertyGroup>
 
+  <ItemGroup>
+    <EmbeddedResource Update="Resources.en-EN.resx"
+                      WithCulture="false"
+                      LogicalName="kServerManager.Core.Resources.resources" />
+  </ItemGroup>
+
 </Project>

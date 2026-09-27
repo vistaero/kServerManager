@@ -1,9 +1,5 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Globalization;
+using System.Threading;
 using System.Windows;
 
 namespace BackupAndStart
@@ -13,5 +9,17 @@ namespace BackupAndStart
     /// </summary>
     public partial class App : Application
     {
+        protected override void OnStartup(StartupEventArgs e)
+        {
+            CultureInfo currentCulture = CultureInfo.CurrentCulture;
+            CultureInfo currentUiCulture = CultureInfo.CurrentUICulture;
+
+            CultureInfo.DefaultThreadCurrentCulture = currentCulture;
+            CultureInfo.DefaultThreadCurrentUICulture = currentUiCulture;
+            Thread.CurrentThread.CurrentCulture = currentCulture;
+            Thread.CurrentThread.CurrentUICulture = currentUiCulture;
+
+            base.OnStartup(e);
+        }
     }
 }

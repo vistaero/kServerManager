@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using Microsoft.Web.WebView2.Core;
+using kServerManager.Properties;
 
 namespace BackupAndStart
 {
@@ -21,7 +22,7 @@ namespace BackupAndStart
             }
             else
             {
-                EulaStatusTextBlock.Text = "The EULA URL is invalid. You cannot accept until it can be displayed.";
+                EulaStatusTextBlock.Text = LocalizedStrings.Get("InvalidEulaUrl");
             }
         }
 
@@ -32,13 +33,13 @@ namespace BackupAndStart
 
             if (!OperatingSystem.IsWindowsVersionAtLeast(10, 0, 17763))
             {
-                EulaStatusTextBlock.Text = "The embedded browser requires Windows 10 version 1809 or later. Open the EULA in your browser instead.";
+                EulaStatusTextBlock.Text = LocalizedStrings.Get("WebViewRequiresWindows");
                 OpenEulaInBrowserButton.IsEnabled = true;
                 return;
             }
 
             OpenEulaInBrowserButton.IsEnabled = true;
-            EulaStatusTextBlock.Text = "Loading the Minecraft EULA…";
+            EulaStatusTextBlock.Text = LocalizedStrings.Get("LoadingEula");
             try
             {
                 await EulaWebView.EnsureCoreWebView2Async();
@@ -47,7 +48,7 @@ namespace BackupAndStart
             }
             catch (Exception error)
             {
-                EulaStatusTextBlock.Text = $"The embedded browser could not start: {error.Message}";
+                EulaStatusTextBlock.Text = LocalizedStrings.Get("WebViewStartFailed", error.Message);
             }
         }
 
@@ -55,7 +56,7 @@ namespace BackupAndStart
         {
             if (!e.IsSuccess)
             {
-                EulaStatusTextBlock.Text = $"The EULA page could not be loaded ({e.WebErrorStatus}). You can open it in your browser.";
+                EulaStatusTextBlock.Text = LocalizedStrings.Get("EulaLoadFailed", e.WebErrorStatus);
                 return;
             }
 
@@ -63,7 +64,7 @@ namespace BackupAndStart
                 return;
 
             _enableDelayStarted = true;
-            EulaStatusTextBlock.Text = "EULA loaded. Please review it before agreeing.";
+            EulaStatusTextBlock.Text = LocalizedStrings.Get("EulaLoaded");
             await Task.Delay(TimeSpan.FromSeconds(5));
             if (IsLoaded)
                 AgreeButton.IsEnabled = true;
@@ -80,7 +81,7 @@ namespace BackupAndStart
             }
             catch (Exception error)
             {
-                EulaStatusTextBlock.Text = $"Could not open the EULA in your browser: {error.Message}";
+                EulaStatusTextBlock.Text = LocalizedStrings.Get("OpenEulaFailed", error.Message);
             }
         }
 
