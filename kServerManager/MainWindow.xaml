@@ -5,7 +5,10 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:BackupAndStart"
         mc:Ignorable="d"
-        Title="kServer Manager" Height="375" Width="685" AllowsTransparency="True" ResizeMode="NoResize" WindowStyle="None" WindowStartupLocation="CenterScreen" Background="{x:Null}" Loaded="Window_Loaded" BorderBrush="Black" Closing="Window_Closing">
+        Title="kServer Manager" Height="375" Width="685" MinHeight="300" MinWidth="580"
+        AllowsTransparency="True" ResizeMode="CanResize" WindowStyle="None" WindowStartupLocation="CenterScreen"
+        Background="{x:Null}" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized"
+        BorderBrush="Black" Closing="Window_Closing" StateChanged="Window_StateChanged">
     <Border BorderBrush="#FF00C5FF" BorderThickness="1">
 
         <DockPanel>
@@ -37,6 +40,32 @@
 
                     <TextBlock Text="r" FontFamily="Webdings" Padding="0.7, 0, 0, 0" FontSize="16" Foreground="White"/>
 
+                </Button>
+                <Button x:Name="MaximizeRestoreButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Width="21" Click="MaximizeRestoreButton_Click"
+                        ToolTip="Maximize">
+                    <Button.Style>
+                        <Style TargetType="{x:Type Button}">
+                            <Setter Property="Background" Value="PaleTurquoise"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="{x:Type Button}">
+                                        <Border Background="{TemplateBinding Background}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                            <Style.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter Property="Background" Value="Turquoise"/>
+                                </Trigger>
+                                <Trigger Property="IsPressed" Value="True">
+                                    <Setter Property="Background" Value="DarkTurquoise"/>
+                                </Trigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                    <TextBlock x:Name="MaximizeRestoreGlyph" Text="□" FontFamily="Segoe UI Symbol" FontSize="13" Foreground="White"/>
                 </Button>
                 <Button x:Name="MinimizeButton" DockPanel.Dock="Right" HorizontalAlignment="Right" Width="21" Click="MinimizeButton_Click">
                     <Button.Style>
@@ -133,6 +162,15 @@
                             </LinearGradientBrush>
                         </Button.Background> Backups
                     </Button>
+
+                    <Button x:Name="RefreshJarsButton" DockPanel.Dock="Top" Margin="5" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="RefreshServerJars_Click">
+                        <Button.Background>
+                            <LinearGradientBrush EndPoint="0.5,1" MappingMode="RelativeToBoundingBox" StartPoint="0.5,0">
+                                <GradientStop Color="#FFEAEAEA"/>
+                                <GradientStop Color="White" Offset="1"/>
+                            </LinearGradientBrush>
+                        </Button.Background> Refresh JARs
+                    </Button>
                     
                     <Label x:Name="AutoBackupLabel" DockPanel.Dock="Top" HorizontalAlignment="Center" Foreground="{DynamicResource {x:Static SystemColors.GradientInactiveCaptionBrushKey}}">Auto-backup in:</Label>
                     <Button x:Name="CancelAutoBackup" DockPanel.Dock="Top" Margin="5" IsEnabled="True" Padding="3" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" BorderBrush="{DynamicResource {x:Static SystemColors.ActiveCaptionBrushKey}}" Click="CancelAutoBackup_Click">
@@ -167,13 +205,24 @@
                 </DockPanel>
 
                 <Grid Grid.Column="1" Grid.Row="1">
-                    <DockPanel x:Name="ConsolePanel" Visibility="Visible">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+                    <StackPanel Grid.Row="0" Margin="8,5,8,4">
+                        <TextBlock Text="Server JAR" FontWeight="SemiBold" Margin="0,0,0,3"/>
+                        <ComboBox x:Name="ServerJarComboBox" Height="27" DisplayMemberPath="DisplayName"
+                                  SelectionChanged="ServerJarComboBox_SelectionChanged"/>
+                        <TextBlock x:Name="JavaRequirementTextBlock" Margin="0,3,0,0" Foreground="DimGray"
+                                   Text="Select a server JAR to inspect its Java requirement." TextTrimming="CharacterEllipsis"/>
+                    </StackPanel>
+                    <DockPanel x:Name="ConsolePanel" Grid.Row="1" Visibility="Visible">
                         <TextBox x:Name="ConsoleInput" DockPanel.Dock="Bottom" Height="25" Background="#7F000000" Foreground="White" FontFamily="Lucida Console" Text="" Padding="3 5" TextWrapping="Wrap" KeyDown="ConsoleInput_KeyDown"/>
                         <TextBox x:Name="ConsoleOutput"  Background="#7F000000" Foreground="White" FontFamily="Lucida Console" Text="" Padding="3 5" TextWrapping="Wrap" IsReadOnly="True" VerticalScrollBarVisibility="Auto"/>
 
                     </DockPanel>
 
-                    <DockPanel x:Name="BackupsPanel" Visibility="Collapsed" Background="#7FD7E4F2">
+                    <DockPanel x:Name="BackupsPanel" Grid.Row="1" Visibility="Collapsed" Background="#7FD7E4F2">
                         <Grid DockPanel.Dock="Top">
                             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" DockPanel.Dock="Top" Margin="0 5 0 5">
                                 <Button x:Name="RestoreButton" Content="Restore" MinWidth="100" Height="24" Foreground="{DynamicResource {x:Static SystemColors.HotTrackBrushKey}}" HorizontalAlignment="Stretch" VerticalAlignment="Top" Background="#FFDDDDFF" IsEnabled="False" Click="RestoreButton_Click"/>

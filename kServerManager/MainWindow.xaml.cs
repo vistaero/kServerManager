@@ -17,6 +17,8 @@ using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using kServerManager;
+using kServerManager.Core;
 
 namespace BackupAndStart
 {
@@ -64,10 +66,65 @@ namespace BackupAndStart
 
     public partial class MainWindow : Window
     {
+        private const int WmGetMinMaxInfo = 0x0024;
+        private const int WmNcHitTest = 0x0084;
+        private const uint MonitorDefaultToNearest = 2;
+        private const int HtLeft = 10;
+        private const int HtRight = 11;
+        private const int HtTop = 12;
+        private const int HtTopLeft = 13;
+        private const int HtTopRight = 14;
+        private const int HtBottom = 15;
+        private const int HtBottomLeft = 16;
+        private const int HtBottomRight = 17;
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativePoint
+        {
+            public int X;
+            public int Y;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeMinMaxInfo
+        {
+            public NativePoint Reserved;
+            public NativePoint MaxSize;
+            public NativePoint MaxPosition;
+            public NativePoint MinTrackSize;
+            public NativePoint MaxTrackSize;
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct NativeMonitorInfo
+        {
+            public int Size;
+            public NativeRect Monitor;
+            public NativeRect Work;
+            public uint Flags;
+        }
+
         [DllImport("user32.dll")]
         internal static extern int SetWindowCompositionAttribute(IntPtr hwnd, ref WindowCompositionAttributeData data);
 
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetMonitorInfo(IntPtr monitor, ref NativeMonitorInfo monitorInfo);
+
         private static readonly HttpClient httpClient = new();
+        private static readonly JdkInstaller jdkInstaller = new();
         readonly static Char directorySeparator = System.IO.Path.DirectorySeparatorChar;
         readonly string sysFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern;
 
@@ -75,8 +132,9 @@ namespace BackupAndStart
         String lastPidPath = "";
         String latestOutput = "";
 
-        String batPath = "";
         String directory = "";
+        String launcherConfigPath = "";
+        LauncherConfig launcherConfig = new();
         
         String worldName = "";
 
@@ -97,18 +155,99 @@ namespace BackupAndStart
             
         }
 
-        private void Window_Loaded(object sender, RoutedEventArgs e)
+        private void Window_SourceInitialized(object? sender, EventArgs e)
+        {
+            HwndSource.FromHwnd(new WindowInteropHelper(this).Handle)?.AddHook(WindowProc);
+        }
+
+        private IntPtr WindowProc(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (message == WmGetMinMaxInfo)
+            {
+                SetMaximizedWorkArea(hwnd, lParam);
+                handled = true;
+                return IntPtr.Zero;
+            }
+
+            if (message != WmNcHitTest || WindowState != WindowState.Normal || ResizeMode == ResizeMode.NoResize)
+                return IntPtr.Zero;
+
+            long packedCoordinates = lParam.ToInt64();
+            int screenX = unchecked((short)(packedCoordinates & 0xFFFF));
+            int screenY = unchecked((short)((packedCoordinates >> 16) & 0xFFFF));
+            Point point = PointFromScreen(new Point(screenX, screenY));
+            const double resizeBorder = 6;
+            bool left = point.X <= resizeBorder;
+            bool right = point.X >= ActualWidth - resizeBorder;
+            bool top = point.Y <= resizeBorder;
+            bool bottom = point.Y >= ActualHeight - resizeBorder;
+
+            int hitTest = (left, right, top, bottom) switch
+            {
+                (true, _, true, _) => HtTopLeft,
+                (_, true, true, _) => HtTopRight,
+                (true, _, _, true) => HtBottomLeft,
+                (_, true, _, true) => HtBottomRight,
+                (true, _, _, _) => HtLeft,
+                (_, true, _, _) => HtRight,
+                (_, _, true, _) => HtTop,
+                (_, _, _, true) => HtBottom,
+                _ => 0
+            };
+
+            if (hitTest == 0)
+                return IntPtr.Zero;
+
+            handled = true;
+            return new IntPtr(hitTest);
+        }
+
+        private void SetMaximizedWorkArea(IntPtr hwnd, IntPtr minMaxInfoPointer)
+        {
+            IntPtr monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+            if (monitor == IntPtr.Zero)
+                return;
+
+            var monitorInfo = new NativeMonitorInfo { Size = Marshal.SizeOf<NativeMonitorInfo>() };
+            if (!GetMonitorInfo(monitor, ref monitorInfo))
+                return;
+
+            NativeMinMaxInfo minMaxInfo = Marshal.PtrToStructure<NativeMinMaxInfo>(minMaxInfoPointer);
+            minMaxInfo.MaxPosition = new NativePoint
+            {
+                X = monitorInfo.Work.Left - monitorInfo.Monitor.Left,
+                Y = monitorInfo.Work.Top - monitorInfo.Monitor.Top
+            };
+            minMaxInfo.MaxSize = new NativePoint
+            {
+                X = monitorInfo.Work.Right - monitorInfo.Work.Left,
+                Y = monitorInfo.Work.Bottom - monitorInfo.Work.Top
+            };
+
+            DpiScale dpi = VisualTreeHelper.GetDpi(this);
+            minMaxInfo.MinTrackSize = new NativePoint
+            {
+                X = (int)Math.Ceiling(MinWidth * dpi.DpiScaleX),
+                Y = (int)Math.Ceiling(MinHeight * dpi.DpiScaleY)
+            };
+
+            Marshal.StructureToPtr(minMaxInfo, minMaxInfoPointer, false);
+        }
+
+        private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
             EnableBlur();
 
-            directory = AppContext.BaseDirectory.TrimEnd(directorySeparator);
+            directory = ResolveServerDirectory();
             backupsDirectory = directory + directorySeparator + "Backups" + directorySeparator;
             lastPidPath = directory + directorySeparator + "lastPid.txt";
+            launcherConfigPath = Path.Combine(directory, "java_config.json");
+            launcherConfig = LauncherConfig.Load(launcherConfigPath);
             worldName = GetPropertyValue("level-name");
 
             CheckCrashed();
-            CheckBat();
-            StartServer(batPath);
+            await RefreshServerJarsAsync();
+            await StartServerAsync();
             ListBackups();
             OptionalBackup();
             GetPublicIP();
@@ -128,6 +267,50 @@ namespace BackupAndStart
             }
 
             ServerImage.Source = new BitmapImage(new Uri(serverIconPath));
+        }
+
+        private static string ResolveServerDirectory()
+        {
+            string applicationDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory));
+            var candidates = new List<string>();
+
+            string workingDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Environment.CurrentDirectory));
+            candidates.Add(workingDirectory);
+            candidates.Add(applicationDirectory);
+
+            DirectoryInfo? parent = Directory.GetParent(applicationDirectory);
+            for (int depth = 0; parent is not null && depth < 5; depth++, parent = parent.Parent)
+                candidates.Add(parent.FullName);
+
+            foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                string configPath = Path.Combine(candidate, "java_config.json");
+                LauncherConfig config = LauncherConfig.Load(configPath);
+                if (!string.IsNullOrWhiteSpace(config.JarPath) && File.Exists(config.JarPath))
+                    return Path.GetDirectoryName(Path.GetFullPath(config.JarPath)) ?? candidate;
+
+                if (LooksLikeServerDirectory(candidate))
+                    return candidate;
+            }
+
+            return applicationDirectory;
+        }
+
+        private static bool LooksLikeServerDirectory(string candidate)
+        {
+            if (File.Exists(Path.Combine(candidate, "server.jar")) ||
+                File.Exists(Path.Combine(candidate, "server.properties")) ||
+                File.Exists(Path.Combine(candidate, "eula.txt")))
+                return true;
+
+            try
+            {
+                return Directory.EnumerateFiles(candidate, "*.jar", SearchOption.TopDirectoryOnly).Any();
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
         }
 
         async void GetPublicIP()
@@ -214,153 +397,156 @@ namespace BackupAndStart
             }
         }
 
-        void CheckBat()
+        private async Task<bool> EnsureServerConfigurationAsync()
         {
-            batPath = SearchFile(".bat");
-            if (batPath.Equals(""))
+            if (ServerJarComboBox.SelectedItem is not ServerJarInfo selectedJar)
             {
-                String jarName = SearchJar();
-                if (jarName.Equals(""))
+                JavaRequirementTextBlock.Text = "Select a server JAR from the list before starting.";
+                return false;
+            }
+
+            launcherConfig.JarPath = selectedJar.Path;
+            int? requiredVersion = selectedJar.MinimumJavaMajor;
+            string? selectedJavaPath = null;
+            int? selectedJavaVersion = null;
+
+            var candidates = JavaInstallationFinder.Find()
+                .Select(installation => installation.Path)
+                .ToList();
+            if (!string.IsNullOrWhiteSpace(launcherConfig.JavaPath) && File.Exists(launcherConfig.JavaPath))
+                candidates.Insert(0, launcherConfig.JavaPath);
+
+            var detectedJava = new List<(string Path, int Major)>();
+            foreach (string candidate in candidates.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                int? major = await JdkInstaller.GetJavaMajorAsync(candidate);
+                if (major is int detectedMajor)
+                    detectedJava.Add((candidate, detectedMajor));
+            }
+
+            if (requiredVersion is int minimumVersion)
+            {
+                (string Path, int Major) match = detectedJava
+                    .Where(java => java.Major >= minimumVersion)
+                    .OrderBy(java => java.Major)
+                    .ThenBy(java => java.Path, StringComparer.OrdinalIgnoreCase)
+                    .FirstOrDefault();
+
+                if (match.Path is not null)
                 {
-                    MessageBox.Show("No .jar found. Can't start server.", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
-                    Environment.Exit(0);
+                    selectedJavaPath = match.Path;
+                    selectedJavaVersion = match.Major;
                 }
-                String command = "java -Xmx1024M -Xms1024M -jar \"" + jarName + "\" nogui";
-                batPath = directory + directorySeparator + "start.bat";
-                System.IO.File.WriteAllText(batPath, command);
-                
-            }
-        }
-
-        private String SearchJar()
-        {
-            String[] jars = System.IO.Directory.GetFiles(directory, "*.jar");
-
-            if (jars.Length == 1)
-            {
-                return System.IO.Path.GetFileName(jars[0]);
-            }
-            else
-            {
-                MessageBox.Show("There are various .jar files. Please select the one you need to open. Proceed with caution. The wrong .jar can corrupt your world.", "Multiple Jar Files", MessageBoxButton.OK, MessageBoxImage.Warning);
-
-                Microsoft.Win32.OpenFileDialog dlg = new Microsoft.Win32.OpenFileDialog();
-                dlg.FileName = "minecraft_server";
-                dlg.DefaultExt = ".jar";
-                dlg.Filter = "Java Application (.jar)|*.jar";
-                dlg.InitialDirectory = directory;
-                Nullable<bool> result = dlg.ShowDialog();
-
-                if (result == true)
-                    return dlg.SafeFileName;
-
-            }
-
-            return "";
-            
-        }
-
-        private String CheckJava()
-        {
-            try
-            {
-                Process.Start("java");
-                return "java";
-            }catch{}
-
-            string programFilesX86 = Environment.ExpandEnvironmentVariables("%ProgramFiles(x86)%");
-            String minecraftRuntimePath = programFilesX86 + directorySeparator + "Minecraft" + directorySeparator + "runtime";
-            if (System.IO.Directory.Exists(minecraftRuntimePath))
-            {
-                String[] exeFiles = System.IO.Directory.GetFiles(minecraftRuntimePath, "java.exe", System.IO.SearchOption.AllDirectories);
-                if (exeFiles.Length > 0)
-                return exeFiles[exeFiles.Length - 1];
-            }
-
-            MessageBox.Show("Can't find Java runtime. Please install Java or Minecraft to start a server.", "Can't find runtime", MessageBoxButton.OK, MessageBoxImage.Error);
-            return "";
-
-        }
-
-        // ============================================
-        // Find Java Installs
-        // ============================================
-        public static List<(string Name, string Path)> FindJavaInstalls()
-        {
-            List<string> basePaths = new()
-        {
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "Java"
-            ),
-
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "Eclipse Adoptium"
-            ),
-
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "Adoptium"
-            ),
-
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
-                "Microsoft"
-            )
-        };
-
-            List<(string Name, string Path)> found = new();
-
-            foreach (string basePath in basePaths)
-            {
-                if (!Directory.Exists(basePath))
-                    continue;
-
-                foreach (string dir in Directory.GetDirectories(basePath))
+                else
                 {
-                    string javaExe =
-                        Path.Combine(dir, "bin", "java.exe");
-
-                    if (File.Exists(javaExe))
+                    MessageBoxResult confirmation = MessageBox.Show(
+                        $"This server JAR requires Java {minimumVersion}, but no compatible Java installation was found.\n\nDownload and install Java {minimumVersion} now?",
+                        "Java installation required",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Question);
+                    if (confirmation != MessageBoxResult.Yes)
                     {
-                        found.Add((
-                            Path.GetFileName(dir),
-                            javaExe
-                        ));
+                        JavaRequirementTextBlock.Text = $"Java {minimumVersion} is required. No server was started.";
+                        return false;
+                    }
+
+                    try
+                    {
+                        selectedJavaPath = await jdkInstaller.InstallAsync(minimumVersion);
+                        selectedJavaVersion = await JdkInstaller.GetJavaMajorAsync(selectedJavaPath);
+                    }
+                    catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException)
+                    {
+                        MessageBox.Show(error.Message, "Java installation failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                        return false;
                     }
                 }
             }
+            else if (detectedJava.Count > 0)
+            {
+                (selectedJavaPath, selectedJavaVersion) = detectedJava[0];
+            }
+            else
+            {
+                JavaRequirementTextBlock.Text = "The JAR's Java requirement could not be inferred and no Java installation was found.";
+                return false;
+            }
 
-            // Detect Java in PATH
+            launcherConfig.JavaPath = selectedJavaPath;
+            launcherConfig.Save(launcherConfigPath);
+            JavaRequirementTextBlock.Text = requiredVersion is int required
+                ? $"Minimum Java inferred from JAR bytecode: {required}. Using installed Java {selectedJavaVersion}."
+                : $"Java requirement could not be inferred. Using installed Java {selectedJavaVersion}.";
+            return true;
+        }
+
+        private async Task RefreshServerJarsAsync()
+        {
+            RefreshJarsButton.IsEnabled = false;
+            JavaRequirementTextBlock.Text = "Inspecting server JAR files…";
             try
             {
-                ProcessStartInfo psi = new()
-                {
-                    FileName = "where",
-                    Arguments = "java",
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                };
+                ServerJarInfo[] jars = await Task.Run(() => Directory
+                    .EnumerateFiles(directory, "*.jar", SearchOption.TopDirectoryOnly)
+                    .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                    .Select(path =>
+                    {
+                        try
+                        {
+                            return JavaRequirementDetector.Inspect(path);
+                        }
+                        catch (Exception error) when (error is IOException or InvalidDataException or UnauthorizedAccessException)
+                        {
+                            return new ServerJarInfo(Path.GetFullPath(path), null);
+                        }
+                    })
+                    .ToArray());
 
-                using Process process = Process.Start(psi)
-                    ?? throw new InvalidOperationException("Could not start Java discovery.");
+                ServerJarComboBox.ItemsSource = jars;
+                ServerJarInfo? selected = jars.FirstOrDefault(jar =>
+                    string.Equals(jar.Path, launcherConfig.JarPath, StringComparison.OrdinalIgnoreCase));
+                if (selected is null && jars.Length == 1)
+                    selected = jars[0];
 
-                string? output = process.StandardOutput.ReadLine();
-
-                if (!string.IsNullOrWhiteSpace(output))
-                {
-                    found.Add(("JAVA in PATH", output));
-                }
+                ServerJarComboBox.SelectedItem = selected;
+                if (selected is null)
+                    JavaRequirementTextBlock.Text = jars.Length == 0
+                        ? $"No .jar files were found in: {directory}"
+                        : "Select a server JAR to inspect its Java requirement.";
+                else
+                    UpdateJavaRequirement(selected);
             }
-            catch
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
+                ServerJarComboBox.ItemsSource = Array.Empty<ServerJarInfo>();
+                JavaRequirementTextBlock.Text = $"Could not read server JAR files: {error.Message}";
             }
+            finally
+            {
+                RefreshJarsButton.IsEnabled = true;
+            }
+        }
 
-            return found
-                .DistinctBy(j => j.Path)
-                .ToList();
+        private void UpdateJavaRequirement(ServerJarInfo jar)
+        {
+            JavaRequirementTextBlock.Text = jar.MinimumJavaMajor is int version
+                ? $"Minimum Java inferred from JAR bytecode: {version}."
+                : "Could not infer the minimum Java version from this JAR's class files.";
+        }
+
+        private void ServerJarComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (ServerJarComboBox.SelectedItem is not ServerJarInfo jar)
+                return;
+
+            launcherConfig.JarPath = jar.Path;
+            UpdateJavaRequirement(jar);
+            launcherConfig.Save(launcherConfigPath);
+        }
+
+        private async void RefreshServerJars_Click(object sender, RoutedEventArgs e)
+        {
+            await RefreshServerJarsAsync();
         }
 
         internal void EnableBlur()
@@ -459,43 +645,26 @@ namespace BackupAndStart
                 return false;
         }
 
-        void StartServer(String file)
+        private async Task StartServerAsync()
         {
             if (IsServerRunning())
                 return;
-            
+
+            if (!await EnsureServerConfigurationAsync())
+                return;
+
             try
             {
-                String[] lines = System.IO.File.ReadAllLines(file);
-                String[] words = lines[0].Split(' ');
-
-                // Configure the process using the StartInfo properties.
-                if (words[0].Equals("java"))
+                serverProcess = new Process
                 {
-                    serverProcess.StartInfo.FileName = CheckJava();
-                    if (serverProcess.StartInfo.FileName.Equals(""))
-                        Environment.Exit(0);
-                }
-                else
-                {
-                    serverProcess.StartInfo.FileName = words[0];
-                }
-
-                String arguments = "";
-
-                for (int i = 1; i < words.Length; i++)
-                {
-                    arguments += words[i] + ' ';
-                }
-                serverProcess.StartInfo.Arguments = arguments;
-                serverProcess.StartInfo.WorkingDirectory = directory;
-                serverProcess.StartInfo.UseShellExecute = false;
+                    StartInfo = ServerProcessFactory.CreateStartInfo(launcherConfig, directory)
+                };
                 serverProcess.StartInfo.RedirectStandardInput = true;
                 serverProcess.StartInfo.RedirectStandardOutput = true;
                 serverProcess.StartInfo.CreateNoWindow = true;
                 serverProcess.OutputDataReceived += RunOutPut;
                 serverProcess.EnableRaisingEvents = true;
-                serverProcess.Exited += new EventHandler(MyProcess_Exited);
+                serverProcess.Exited += MyProcess_Exited;
                 serverProcess.Start();
                 serverProcess.BeginOutputReadLine();
                 System.IO.File.WriteAllText(lastPidPath, serverProcess.Id.ToString());
@@ -808,7 +977,7 @@ namespace BackupAndStart
             });
 
             if (wasRunning)
-                StartServer(batPath);
+                await StartServerAsync();
 
             RestoreButton.Content = "Restore";
         }
@@ -844,9 +1013,9 @@ namespace BackupAndStart
             StopServer();
         }
 
-        private void StartButton_Click(object sender, RoutedEventArgs e)
+        private async void StartButton_Click(object sender, RoutedEventArgs e)
         {
-            StartServer(batPath);
+            await StartServerAsync();
         }
 
         private void RestartButton_Click(object sender, RoutedEventArgs e)
@@ -856,28 +1025,40 @@ namespace BackupAndStart
 
         async private void RestartServer()
         {
-            StopServer();
-
-            await Task.Run(() =>
+            if (StopServer())
             {
-                do
-                {
-                    if (!IsServerRunning())
-                    {
-                        Dispatcher.Invoke(() => StartServer(batPath));
-                        break;
-                    }
+                while (IsServerRunning())
+                    await Task.Delay(250);
+            }
 
-                } while (true);
-            });
-            
+            await StartServerAsync();
+        }
+
+        private void MaximizeRestoreButton_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
         }
 
         private void TitleBar_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+            if (e.ChangedButton != System.Windows.Input.MouseButton.Left)
+                return;
 
-                this.DragMove();
+            if (e.ClickCount == 2)
+            {
+                WindowState = WindowState == WindowState.Maximized ? WindowState.Normal : WindowState.Maximized;
+                return;
+            }
+
+            if (WindowState == WindowState.Normal)
+                DragMove();
+        }
+
+        private void Window_StateChanged(object? sender, EventArgs e)
+        {
+            bool isMaximized = WindowState == WindowState.Maximized;
+            MaximizeRestoreGlyph.Text = isMaximized ? "❐" : "□";
+            MaximizeRestoreButton.ToolTip = isMaximized ? "Restore" : "Maximize";
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
