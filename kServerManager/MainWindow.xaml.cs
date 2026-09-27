@@ -19,6 +19,7 @@ using System.Windows.Media.Imaging;
 using System.Windows.Threading;
 using kServerManager;
 using kServerManager.Core;
+using kServerManager.Properties;
 
 namespace BackupAndStart
 {
@@ -129,6 +130,11 @@ namespace BackupAndStart
         readonly string sysFormat = CultureInfo.CurrentCulture.DateTimeFormat.ShortDatePattern;
 
         Process serverProcess = new Process();
+        private readonly object serverResponseLock = new();
+        private TaskCompletionSource<bool> serverReadyCompletion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private TaskCompletionSource<bool>? pendingServerResponse;
+        private Func<string, bool>? pendingServerResponseMatcher;
+        private volatile bool serverReady;
         String lastPidPath = "";
         String latestOutput = "";
 
@@ -236,6 +242,8 @@ namespace BackupAndStart
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            BackupButton.IsEnabled = false;
+            BackupButton.Content = LocalizedStrings.Get("StartingServer");
             EnableBlur();
 
             directory = ResolveServerDirectory();
@@ -248,6 +256,8 @@ namespace BackupAndStart
             CheckCrashed();
             await RefreshServerJarsAsync();
             await StartServerAsync();
+            BackupButton.IsEnabled = true;
+            BackupButton.Content = LocalizedStrings.Get("BackUp");
             ListBackups();
             OptionalBackup();
             GetPublicIP();
@@ -336,7 +346,7 @@ namespace BackupAndStart
                 }
             }
             publicIP = tempIP;
-            IPButton.Content = "IP: " + publicIP + Environment.NewLine + "Port: " + port.ToString();
+            IPButton.Content = LocalizedStrings.Get("IpLabel", publicIP, Environment.NewLine, port);
             IPButton.IsEnabled = true;
 
         }
@@ -374,7 +384,7 @@ namespace BackupAndStart
 
         void MsgBox(string message)
         {
-            MessageBox.Show(message, "Debug Box", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show(message, LocalizedStrings.Get("DebugBox"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
         
         void CheckCrashed()
@@ -385,7 +395,7 @@ namespace BackupAndStart
                 {
                     if (item.Id.ToString().Equals(lastPid))
                     {
-                        MessageBoxResult result = MessageBox.Show("The server we ran the last time is still running, but kServer Manager was forced to stop and we couldn't stop the server.\n\nPlease connect to the server using Minecraft and use the command to stop.\n\nIf you can't, you can force the server to stop pressing OK.\n\nIf you don't have an auto-save feature enabled, you may experience a rollback.", "kServer Manager has lose control of the server", MessageBoxButton.OKCancel, MessageBoxImage.Exclamation);
+                        MessageBoxResult result = MessageBox.Show(LocalizedStrings.Get("PreviousServerStillRunning"), LocalizedStrings.Get("LostServerControl"), MessageBoxButton.OKCancel, MessageBoxImage.Exclamation);
                         if (result == MessageBoxResult.OK)
                         {
                             item.Kill();
@@ -401,7 +411,7 @@ namespace BackupAndStart
         {
             if (ServerJarComboBox.SelectedItem is not ServerJarInfo selectedJar)
             {
-                JavaRequirementTextBlock.Text = "Select a server JAR from the list before starting.";
+                JavaRequirementTextBlock.Text = LocalizedStrings.Get("SelectJarBeforeStart");
                 return false;
             }
 
@@ -440,13 +450,13 @@ namespace BackupAndStart
                 else
                 {
                     MessageBoxResult confirmation = MessageBox.Show(
-                        $"This server JAR requires Java {minimumVersion}, but no compatible Java installation was found.\n\nDownload and install Java {minimumVersion} now?",
-                        "Java installation required",
+                        LocalizedStrings.Get("JavaRequiredInstall", minimumVersion),
+                        LocalizedStrings.Get("JavaInstallationRequired"),
                         MessageBoxButton.YesNo,
                         MessageBoxImage.Question);
                     if (confirmation != MessageBoxResult.Yes)
                     {
-                        JavaRequirementTextBlock.Text = $"Java {minimumVersion} is required. No server was started.";
+                        JavaRequirementTextBlock.Text = LocalizedStrings.Get("JavaRequiredNotStarted", minimumVersion);
                         return false;
                     }
 
@@ -457,7 +467,7 @@ namespace BackupAndStart
                     }
                     catch (Exception error) when (error is IOException or HttpRequestException or InvalidOperationException)
                     {
-                        MessageBox.Show(error.Message, "Java installation failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                        MessageBox.Show(error.Message, LocalizedStrings.Get("JavaInstallationFailed"), MessageBoxButton.OK, MessageBoxImage.Error);
                         return false;
                     }
                 }
@@ -468,22 +478,22 @@ namespace BackupAndStart
             }
             else
             {
-                JavaRequirementTextBlock.Text = "The JAR's Java requirement could not be inferred and no Java installation was found.";
+                JavaRequirementTextBlock.Text = LocalizedStrings.Get("JavaRequirementUnknownNoJava");
                 return false;
             }
 
             launcherConfig.JavaPath = selectedJavaPath;
             launcherConfig.Save(launcherConfigPath);
             JavaRequirementTextBlock.Text = requiredVersion is int required
-                ? $"Minimum Java inferred from JAR bytecode: {required}. Using installed Java {selectedJavaVersion}."
-                : $"Java requirement could not be inferred. Using installed Java {selectedJavaVersion}.";
+                ? LocalizedStrings.Get("JavaMinimumUsingInstalled", required, selectedJavaVersion)
+                : LocalizedStrings.Get("JavaUnknownUsingInstalled", selectedJavaVersion);
             return true;
         }
 
         private async Task RefreshServerJarsAsync()
         {
             RefreshJarsButton.IsEnabled = false;
-            JavaRequirementTextBlock.Text = "Inspecting server JAR files…";
+            JavaRequirementTextBlock.Text = LocalizedStrings.Get("InspectingJars");
             try
             {
                 ServerJarInfo[] jars = await Task.Run(() => Directory
@@ -511,15 +521,15 @@ namespace BackupAndStart
                 ServerJarComboBox.SelectedItem = selected;
                 if (selected is null)
                     JavaRequirementTextBlock.Text = jars.Length == 0
-                        ? $"No .jar files were found in: {directory}"
-                        : "Select a server JAR to inspect its Java requirement.";
+                        ? LocalizedStrings.Get("NoJarFilesFound", directory)
+                        : LocalizedStrings.Get("SelectServerJar");
                 else
                     UpdateJavaRequirement(selected);
             }
             catch (Exception error) when (error is IOException or UnauthorizedAccessException)
             {
                 ServerJarComboBox.ItemsSource = Array.Empty<ServerJarInfo>();
-                JavaRequirementTextBlock.Text = $"Could not read server JAR files: {error.Message}";
+                JavaRequirementTextBlock.Text = LocalizedStrings.Get("CouldNotReadJars", error.Message);
             }
             finally
             {
@@ -530,8 +540,8 @@ namespace BackupAndStart
         private void UpdateJavaRequirement(ServerJarInfo jar)
         {
             JavaRequirementTextBlock.Text = jar.MinimumJavaMajor is int version
-                ? $"Minimum Java inferred from JAR bytecode: {version}."
-                : "Could not infer the minimum Java version from this JAR's class files.";
+                ? LocalizedStrings.Get("MinimumJava", version)
+                : LocalizedStrings.Get("CouldNotInferJava");
         }
 
         private void ServerJarComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -577,7 +587,7 @@ namespace BackupAndStart
             String runningState;
             if (running)
             {
-                runningState = " (Running) ";
+                runningState = LocalizedStrings.Get("RunningIndicator");
                 StartButton.Visibility = Visibility.Collapsed;
                 StopButton.Visibility = Visibility.Visible;
                 RestartButton.Visibility = Visibility.Visible;
@@ -602,7 +612,7 @@ namespace BackupAndStart
 
             if (!System.IO.File.Exists(eulaPath))
             {
-                MessageBox.Show("There's no eula.txt file yet. Start the server to generate it.");
+                MessageBox.Show(LocalizedStrings.Get("NoEulaFile"));
                 return;
             }
                 
@@ -650,11 +660,16 @@ namespace BackupAndStart
             if (IsServerRunning())
                 return;
 
-            if (!await EnsureServerConfigurationAsync())
-                return;
-
+            serverReady = false;
+            serverReadyCompletion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             try
             {
+                if (!await EnsureServerConfigurationAsync())
+                {
+                    serverReadyCompletion.TrySetResult(false);
+                    return;
+                }
+
                 serverProcess = new Process
                 {
                     StartInfo = ServerProcessFactory.CreateStartInfo(launcherConfig, directory)
@@ -673,26 +688,61 @@ namespace BackupAndStart
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.Message);
+                serverReadyCompletion.TrySetResult(false);
+            MessageBox.Show(ex.Message);
             }
             
         }
 
         private void MyProcess_Exited(object? sender, System.EventArgs e)
         {
+            if (!serverReady)
+                serverReadyCompletion.TrySetResult(false);
+
+            TaskCompletionSource<bool>? response;
+            lock (serverResponseLock)
+            {
+                response = pendingServerResponse;
+                pendingServerResponse = null;
+                pendingServerResponseMatcher = null;
+            }
+            response?.TrySetException(new InvalidOperationException(LocalizedStrings.Get("ServerExitedBeforeCommand")));
+
             Dispatcher.Invoke(() => UpdateState(false));
         }
 
-        bool savingPendingForBackup;
+        bool backupInProgress;
         public void RunOutPut(object sender, DataReceivedEventArgs e)
         {
             if (e.Data is not string output)
                 return;
 
-            if (savingPendingForBackup && output.EndsWith("Saved the world"))
-                MakeBackup();
+            if (output.Contains("Done (", StringComparison.OrdinalIgnoreCase) &&
+                output.Contains("For help", StringComparison.OrdinalIgnoreCase))
+            {
+                serverReady = true;
+                serverReadyCompletion.TrySetResult(true);
+            }
+
+            CompletePendingServerResponse(output);
 
             Dispatcher.Invoke(() => AppendLine(output));
+        }
+
+        private void CompletePendingServerResponse(string output)
+        {
+            TaskCompletionSource<bool>? response = null;
+            lock (serverResponseLock)
+            {
+                if (pendingServerResponse is not null && pendingServerResponseMatcher?.Invoke(output) == true)
+                {
+                    response = pendingServerResponse;
+                    pendingServerResponse = null;
+                    pendingServerResponseMatcher = null;
+                }
+            }
+
+            response?.TrySetResult(true);
         }
         
         private void AppendLine(String line)
@@ -702,17 +752,12 @@ namespace BackupAndStart
             latestOutput = line;
         }
 
-        private void BackupButton_Click(object sender, RoutedEventArgs e)
+        private async void BackupButton_Click(object sender, RoutedEventArgs e)
         {
-            if (IsServerRunning())
-            {
-                serverProcess.StandardInput.WriteLine("save-all");
-                savingPendingForBackup = true;
-            }
-            else
-            {
-                MakeBackup();
-            }
+            if (backupInProgress)
+                return;
+
+            await MakeBackupAsync();
         }
 
         private void ReadServerProperties()
@@ -747,8 +792,7 @@ namespace BackupAndStart
 
         private void OptionalBackup()
         {
-            string label = AutoBackupLabel.Content?.ToString() ?? "";
-            AutoBackupLabel.Content = label + " 10";
+            AutoBackupLabel.Content = LocalizedStrings.Get("AutoBackupIn") + " 10";
             int i = 10;
             //INSTANCIANDO EL TIMER CON LA CLASE DISPATCHERTIMER 
             autoBackupTimer = new DispatcherTimer();
@@ -773,47 +817,220 @@ namespace BackupAndStart
 
                     else
                     {*/
-                        MakeBackup();
+                _ = MakeBackupAsync();
                         StopAutoBackupTimer();
                     //}
                         
                 }else
-                    AutoBackupLabel.Content = label + " " + (i -= 1).ToString();
+                    AutoBackupLabel.Content = LocalizedStrings.Get("AutoBackupIn") + " " + (i -= 1).ToString();
 
             };
             autoBackupTimer.Start();
             
         }
 
-        private void MakeBackup(string name = "default")
+        private async Task MakeBackupAsync(string name = "default")
         {
-            int latestIndex = 0;
-            
-            foreach (BackupFile file in backups)
-            {
-                int index = 0;
+            if (backupInProgress)
+                return;
 
-                try
+            backupInProgress = true;
+            BackupButton.IsEnabled = false;
+            BackupButton.Content = LocalizedStrings.Get("WaitingForServer");
+
+            string? archivePath = null;
+            bool archiveCreated = false;
+            bool saveOffCommandSent = false;
+            Exception? backupError = null;
+            Exception? saveOnError = null;
+            try
+            {
+                string worldDirectory = Path.Combine(directory, worldName);
+                if (!Directory.Exists(worldDirectory))
+                    throw new DirectoryNotFoundException(LocalizedStrings.Get("WorldFolderNotFound", worldDirectory));
+
+                Directory.CreateDirectory(backupsDirectory);
+
+                if (IsServerRunning())
                 {
-                    String currentIndex = file.BackupName.Remove(0, worldName.Length + 1);
-                    int.TryParse(currentIndex, out index);
-                    if (index > latestIndex)
-                    {
-                        latestIndex = index;
-                    }
+                    await WaitForServerReadyAsync(TimeSpan.FromMinutes(5));
+
+                    BackupButton.Content = LocalizedStrings.Get("DisablingAutosave");
+                    saveOffCommandSent = true;
+                    await SendServerCommandAndWaitAsync(
+                        "save-off",
+                        line => line.Contains("Automatic saving is now disabled", StringComparison.OrdinalIgnoreCase),
+                        TimeSpan.FromMinutes(1));
+
+                    BackupButton.Content = LocalizedStrings.Get("SavingWorld");
+                    await SendServerCommandAndWaitAsync(
+                        "save-all flush",
+                        line => line.Contains("Saved the game", StringComparison.OrdinalIgnoreCase) ||
+                                line.Contains("Saved the world", StringComparison.OrdinalIgnoreCase),
+                        TimeSpan.FromMinutes(5));
                 }
-                catch(Exception ex)
+
+                string backupName = name.Equals("default", StringComparison.OrdinalIgnoreCase) ? worldName : name;
+                string prefix = worldName + ".";
+                int latestIndex = 0;
+                foreach (BackupFile file in backups)
                 {
-                    MessageBox.Show(ex.Message);
+                    if (file.BackupName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) &&
+                        int.TryParse(file.BackupName.AsSpan(prefix.Length), out int index))
+                        latestIndex = Math.Max(latestIndex, index);
+                }
+
+                BackupButton.Content = LocalizedStrings.Get("BackingUp");
+                archivePath = Path.Combine(backupsDirectory, $"{backupName}.{latestIndex + 1}.zip");
+                await Task.Run(() => CreateBackupArchive(worldDirectory, archivePath));
+                archiveCreated = true;
+            }
+            catch (Exception ex)
+            {
+                backupError = ex;
+                if (!archiveCreated && archivePath is not null)
+                {
+                    try
+                    {
+                        if (File.Exists(archivePath))
+                            File.Delete(archivePath);
+                    }
+                    catch (Exception cleanupError)
+                    {
+                        ex.Data[LocalizedStrings.Get("PartialBackupCleanupError")] = cleanupError.ToString();
+                    }
                 }
 
             }
+            finally
+            {
+                if (saveOffCommandSent)
+                {
+                    if (IsServerRunning())
+                    {
+                        try
+                        {
+                            BackupButton.Content = LocalizedStrings.Get("ReenablingAutosave");
+                            await SendServerCommandAndWaitAsync(
+                                "save-on",
+                                line => line.Contains("Automatic saving is now enabled", StringComparison.OrdinalIgnoreCase),
+                                TimeSpan.FromMinutes(1));
+                        }
+                        catch (Exception ex)
+                        {
+                            saveOnError = ex;
+                        }
+                    }
+                    else
+                    {
+                        saveOnError = new InvalidOperationException(LocalizedStrings.Get("ServerExitedAutosave"));
+                    }
+                }
 
-            if (name.Equals("default"))
-                CompressFolder(directory + directorySeparator + worldName, backupsDirectory + directorySeparator + worldName + "." + (latestIndex + 1));
-            else
-                CompressFolder(directory + directorySeparator + worldName, backupsDirectory + directorySeparator + name + "." + (latestIndex + 1));
+                backupInProgress = false;
+                BackupButton.IsEnabled = true;
+                BackupButton.Content = LocalizedStrings.Get("BackUp");
+                try
+                {
+                    ListBackups();
+                }
+                catch (Exception refreshError)
+                {
+                    MessageBox.Show(GetDetailedExceptionMessage(refreshError), LocalizedStrings.Get("CouldNotRefreshBackups"), MessageBoxButton.OK, MessageBoxImage.Error);
+                }
+            }
 
+            if (backupError is not null || saveOnError is not null)
+            {
+                var message = new System.Text.StringBuilder();
+                if (backupError is not null)
+                    message.AppendLine(LocalizedStrings.Get("BackupFailed")).AppendLine(GetDetailedExceptionMessage(backupError));
+                else if (archiveCreated)
+                    message.AppendLine(LocalizedStrings.Get("BackupCreatedAutosaveUnconfirmed"));
+
+                if (saveOnError is not null)
+                    message.AppendLine().AppendLine(LocalizedStrings.Get("CouldNotVerifySaveOn")).AppendLine(GetDetailedExceptionMessage(saveOnError));
+
+                MessageBox.Show(message.ToString(), LocalizedStrings.Get("BackupWarning"), MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private static void CreateBackupArchive(string sourceDirectory, string archivePath)
+        {
+            using var output = new FileStream(archivePath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.None);
+            using var archive = new ZipArchive(output, ZipArchiveMode.Create);
+
+            foreach (string filePath in Directory.EnumerateFiles(sourceDirectory, "*", SearchOption.AllDirectories))
+            {
+                string entryName = Path.GetRelativePath(sourceDirectory, filePath)
+                    .Replace(Path.DirectorySeparatorChar, '/');
+                if (entryName.Equals("session.lock", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                archive.CreateEntryFromFile(filePath, entryName, CompressionLevel.Optimal);
+            }
+        }
+
+        private async Task WaitForServerReadyAsync(TimeSpan timeout)
+        {
+            if (serverReady)
+                return;
+            if (!IsServerRunning())
+                throw new InvalidOperationException(LocalizedStrings.Get("ServerNotRunning"));
+
+            bool ready = await serverReadyCompletion.Task.WaitAsync(timeout);
+            if (!ready || !IsServerRunning())
+                throw new InvalidOperationException(LocalizedStrings.Get("ServerExitedBeforeStart"));
+        }
+
+        private async Task SendServerCommandAndWaitAsync(string command, Func<string, bool> confirmation, TimeSpan timeout)
+        {
+            var response = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            lock (serverResponseLock)
+            {
+                if (pendingServerResponse is not null)
+                    throw new InvalidOperationException(LocalizedStrings.Get("CommandAwaitingConfirmation"));
+
+                pendingServerResponse = response;
+                pendingServerResponseMatcher = confirmation;
+            }
+
+            try
+            {
+                if (!IsServerRunning())
+                    throw new InvalidOperationException(LocalizedStrings.Get("ServerNotRunning"));
+
+                serverProcess.StandardInput.WriteLine(command);
+                await response.Task.WaitAsync(timeout);
+            }
+            catch (TimeoutException ex)
+            {
+                throw new TimeoutException(LocalizedStrings.Get("CommandConfirmationTimeout", command), ex);
+            }
+            finally
+            {
+                lock (serverResponseLock)
+                {
+                    if (ReferenceEquals(pendingServerResponse, response))
+                    {
+                        pendingServerResponse = null;
+                        pendingServerResponseMatcher = null;
+                    }
+                }
+            }
+        }
+
+        private static string GetDetailedExceptionMessage(Exception exception)
+        {
+            var details = new System.Text.StringBuilder(exception.ToString());
+            if (exception.Data.Count > 0)
+            {
+                details.AppendLine().AppendLine(LocalizedStrings.Get("AdditionalErrorDetails"));
+                foreach (System.Collections.DictionaryEntry item in exception.Data)
+                    details.AppendLine($"{item.Key}: {item.Value}");
+            }
+
+            return details.ToString();
         }
 
         private void ListBackups()
@@ -836,42 +1053,6 @@ namespace BackupAndStart
    
         }
         
-        async void CompressFolder(string folder, string targetFilename)
-        {
-            try
-            {
-                
-                BackupButton.IsEnabled = false;
-                BackupButton.Content = "Backing Up";
-
-                await Task.Run(() =>
-                {
-                    Microsoft.VisualBasic.FileIO.FileSystem.CopyDirectory(folder, targetFilename);
-                });
-
-                await Task.Run(() =>
-                 {
-                ZipFile.CreateFromDirectory(targetFilename, targetFilename + ".zip");
-                });
-
-                await Task.Run(() =>
-                {
-                    System.IO.Directory.Delete(targetFilename, true);
-                });
-
-                BackupButton.IsEnabled = true;
-
-                BackupButton.Content = "Back Up";
-            }
-            catch (Exception ex)
-            {
-                MessageBox.Show(ex.Message);
-            }
-
-            ListBackups();
-
-        }
-
         private void ConsoleInput_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
         {
             if (e.Key == System.Windows.Input.Key.Enter && IsServerRunning())
@@ -886,7 +1067,7 @@ namespace BackupAndStart
         {
             foreach(BackupFile item in BackupsDataGrid.SelectedItems)
             {
-                DeleteButton.Content = "Deleting...";
+                DeleteButton.Content = LocalizedStrings.Get("Deleting");
                 String fileToDelete = backupsDirectory + directorySeparator + item.BackupName + ".zip";
                 try
                 {
@@ -894,11 +1075,11 @@ namespace BackupAndStart
                 }
                 catch(Exception ex)
                 {
-                    MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show(ex.Message, LocalizedStrings.Get("Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 }
                 
             }
-            DeleteButton.Content = "Delete";
+            DeleteButton.Content = LocalizedStrings.Get("Delete");
             BackupsDataGrid.SelectedIndex = -1;
             ListBackups();
 
@@ -938,7 +1119,7 @@ namespace BackupAndStart
 
         async private void RestoreBackup(String file)
         {
-            RestoreButton.Content = "Restoring...";
+            RestoreButton.Content = LocalizedStrings.Get("Restoring");
             RestoreButton.IsEnabled = false;
             bool wasRunning = StopServer();
 
@@ -963,7 +1144,7 @@ namespace BackupAndStart
                         catch (Exception ex)
                         {
                             MessageBox.Show(ex.Message);
-                            Dispatcher.Invoke(() => RestoreButton.Content = "Restore");
+                            Dispatcher.Invoke(() => RestoreButton.Content = LocalizedStrings.Get("Restore"));
                         }
                         break;
                     }
@@ -979,7 +1160,7 @@ namespace BackupAndStart
             if (wasRunning)
                 await StartServerAsync();
 
-            RestoreButton.Content = "Restore";
+            RestoreButton.Content = LocalizedStrings.Get("Restore");
         }
 
         private bool StopServer()
@@ -1058,7 +1239,7 @@ namespace BackupAndStart
         {
             bool isMaximized = WindowState == WindowState.Maximized;
             MaximizeRestoreGlyph.Text = isMaximized ? "❐" : "□";
-            MaximizeRestoreButton.ToolTip = isMaximized ? "Restore" : "Maximize";
+            MaximizeRestoreButton.ToolTip = isMaximized ? LocalizedStrings.Get("RestoreWindow") : LocalizedStrings.Get("Maximize");
         }
 
         private void CloseButton_Click(object sender, RoutedEventArgs e)
@@ -1090,7 +1271,7 @@ namespace BackupAndStart
                     Microsoft.VisualBasic.FileIO.FileSystem.RenameFile(backupsDirectory + directorySeparator + oldName + ".zip", newName + ".zip");
             }catch(Exception ex)
             {
-                MessageBox.Show(ex.Message, "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show(ex.Message, LocalizedStrings.Get("Error"), MessageBoxButton.OK, MessageBoxImage.Error);
                 tb.Text = oldName;
             }
         }
@@ -1105,11 +1286,11 @@ namespace BackupAndStart
             switch (e.PropertyName)
             {
                 case "BackupName":
-                    e.Column.Header = "Name";
+                    e.Column.Header = LocalizedStrings.Get("ColumnName");
                     break;
 
                 case "CreationDate":
-                    e.Column.Header = "Date";
+                    e.Column.Header = LocalizedStrings.Get("ColumnDate");
                     break;
 
                 default:
@@ -1136,7 +1317,7 @@ namespace BackupAndStart
         {
             if (IsServerRunning())
             {
-                MessageBoxResult result = MessageBox.Show("Please stop the server before closing this kServer Manager.\n\nIf you continue, you are forcing the server to stop and that can produce unexpected results, like data lose or corruption.\n\nAlthough the server could have an auto-save feature, that does not guarantee that your latest changes are saved.", "Stop before close", MessageBoxButton.YesNo, MessageBoxImage.Warning);
+                MessageBoxResult result = MessageBox.Show(LocalizedStrings.Get("StopBeforeCloseMessage"), LocalizedStrings.Get("StopBeforeClose"), MessageBoxButton.YesNo, MessageBoxImage.Warning);
                 if (result == MessageBoxResult.Yes)
                     e.Cancel = true;
             }
